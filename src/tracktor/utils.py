@@ -375,8 +375,17 @@ def get_mot_accum(results, seq):
     return mot_accum
 
     
-def evaluate_mot_accums(accums, names, generate_overall=False):
+def evaluate_mot_accums(accums, names, generate_overall=False, show_high_precision=False):
     mh = mm.metrics.create()
+
+    if show_high_precision:
+        mh.register(mota, formatter='{:.2%}'.format)
+        mh.register(precision, formatter='{:.2%}'.format)
+        mh.register(recall, formatter='{:.2%}'.format)
+        mh.register(idp, formatter='{:.2%}'.format)
+        mh.register(idr, formatter='{:.2%}'.format)
+        mh.register(idf1, formatter='{:.2%}'.format)
+
     summary = mh.compute_many(
         accums, 
         metrics=mm.metrics.motchallenge_metrics, 
