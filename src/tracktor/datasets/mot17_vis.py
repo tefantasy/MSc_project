@@ -12,11 +12,12 @@ class MOT17Vis(Dataset):
     """
     Dataset for training visualization prediction sub-module.
     """
-    def __init__(self, split, train_ratio, vis_threshold):
+    def __init__(self, split, train_ratio, vis_threshold, train_bbox_jitter=True):
         train_folders = ['MOT17-02', 'MOT17-04', 'MOT17-05', 'MOT17-09', 'MOT17-10',
                          'MOT17-11', 'MOT17-13']
 
         self._split = split
+        self._train_bbox_jitter = train_bbox_jitter
 
         self.image_transform = ToTensor()
 
@@ -55,6 +56,25 @@ class MOT17Vis(Dataset):
                         'vis':sample_vis
                     })
 
+    def bbox_jitter(self, bboxs, im_w, im_h):
+        bboxs = np.array(bboxs, dtype=np.float32)
+        track_len = bboxs.shape[0]
+
+        bbox_w = bboxs[:, 2] - bboxs[:, 0]
+        bbox_h = bboxs[:, 3] - bboxs[:, 1]
+
+        bboxs[:, 0] += np.clip(np.random.normal(0.0, bbox_w * 0.05), -bbox_w * 0.1, bbox_w * 0.1)
+        bboxs[:, 2] += np.clip(np.random.normal(0.0, bbox_w * 0.05), -bbox_w * 0.1, bbox_w * 0.1)
+        bboxs[:, 1] += np.clip(np.random.normal(0.0, bbox_h * 0.05), -bbox_h * 0.1, bbox_h * 0.1)
+        bboxs[:, 3] += np.clip(np.random.normal(0.0, bbox_h * 0.05), -bbox_h * 0.1, bbox_h * 0.1)
+
+        bboxs[:, 0] = np.clip(bboxs[:, 0], 0, im_w - 1)
+        bboxs[:, 1] = np.clip(bboxs[:, 1], 0, im_h - 1)
+        bboxs[:, 2] = np.clip(bboxs[:, 2], 0, im_w - 1)
+        bboxs[:, 3] = np.clip(bboxs[:, 3], 0, im_h - 1)
+
+        return bboxs
+
     def __len__(self):
         return len(self._vis_data)
 
@@ -63,9 +83,15 @@ class MOT17Vis(Dataset):
 
         img = self.image_transform(Image.open(data['im_path']).convert('RGB'))
 
+        if self._split == 'train' and self._train_bbox_jitter:
+            im_h, im_w = img.size()[-2:]
+            data_gt = self.bbox_jitter(data['gt'], im_w, im_h)
+        else:
+            data_gt = data['gt']
+
         data = {
             'img':img,
-            'gt':torch.tensor(data['gt']),
+            'gt':torch.tensor(data_gt),
             'vis':torch.tensor(data['vis'])
         }
         return data
