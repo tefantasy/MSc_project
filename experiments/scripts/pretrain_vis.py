@@ -1,6 +1,7 @@
 import os.path as osp
 import os
 import yaml
+import argparse
 
 import numpy as np
 import torch
@@ -77,13 +78,14 @@ def get_features(obj_detect, img, gts):
 
     return box_features.cpu(), box_head_features.cpu()
 
-def pretrain_main():
+def pretrain_main(lr, weight_decay, batch_size, output_dir, ex_name):
     torch.manual_seed(12345)
     torch.cuda.manual_seed(12345)
     np.random.seed(12345)
     torch.backends.cudnn.deterministic = True
 
-    output_dir = osp.join(get_output_dir('motion'), 'vis')
+    # output_dir = osp.join(get_output_dir('motion'), 'vis')
+    output_dir = osp.join(output_dir, ex_name)
 
     if not osp.exists(output_dir):
         os.makedirs(output_dir)
@@ -112,7 +114,7 @@ def pretrain_main():
     vis_model.train()
     vis_model.cuda()
 
-    optimizer = torch.optim.Adam(vis_model.parameters(), lr=1e-4, weight_decay=1e-5)
+    optimizer = torch.optim.Adam(vis_model.parameters(), lr=lr, weight_decay=weight_decay)
     loss_func = nn.MSELoss()
 
     #######################
@@ -120,7 +122,6 @@ def pretrain_main():
     #######################
 
     max_epochs = 100
-    batch_size = 32
 
     conv_batch_forger = BatchForger(batch_size, (vis_model.output_dim, vis_model.pool_size, vis_model.pool_size))
     repr_batch_forger = BatchForger(batch_size, (vis_model.representation_dim,))
@@ -205,5 +206,16 @@ def pretrain_main():
             lowest_val_loss, lowest_val_loss_epoch = mean_val_loss, epoch + 1
             torch.save(vis_model.state_dict(), osp.join(output_dir, 'vis_model_epoch_%d.pth'%(epoch+1)))
 
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--output_dir', type=str, default='/cs/student/vbox/tianjliu/tracktor_output')
+    parser.add_argument('--ex_name', type=str, default='vis_default')
 
-pretrain_main()
+    parser.add_argument('--lr', type=float, default=1e-4)
+    parser.add_argument('--weight_decay', type=float, default=1e-5)
+    parser.add_argument('--batch_size', type=int, default=32)
+    args = parser.parse_args()
+    print(args)
+
+
+    pretrain_main(args.lr, args.weight_decay, args.batch_size, args.output_dir, args.ex_name)
