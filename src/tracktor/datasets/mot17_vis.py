@@ -1,4 +1,5 @@
 import math
+from random import random
 
 from PIL import Image
 import numpy as np
@@ -12,12 +13,13 @@ class MOT17Vis(Dataset):
     """
     Dataset for training visualization prediction sub-module.
     """
-    def __init__(self, split, train_ratio, vis_threshold, train_bbox_jitter=True):
+    def __init__(self, split, train_ratio, vis_threshold, train_bbox_jitter=True, random_image_flip=False):
         train_folders = ['MOT17-02', 'MOT17-04', 'MOT17-05', 'MOT17-09', 'MOT17-10',
                          'MOT17-11', 'MOT17-13']
 
         self._split = split
         self._train_bbox_jitter = train_bbox_jitter
+        self._random_image_flip = random_image_flip
 
         self.image_transform = ToTensor()
 
@@ -75,18 +77,40 @@ class MOT17Vis(Dataset):
 
         return bboxs
 
+    def bbox_flip(self, bboxs, im_w, im_h):
+        bboxs = np.array(bboxs, dtype=np.float32)
+        bbox_flip_right = im_w - 1 - bboxs[:, 0]
+        bbox_flip_left = im_w - 1 - bboxs[:, 2]
+        bboxs[:, 0] = bbox_flip_left
+        bboxs[:, 2] = bbox_flip_right
+
+        return bboxs
+
+
     def __len__(self):
         return len(self._vis_data)
 
     def __getitem__(self, idx):
         data = self._vis_data[idx]
 
-        img = self.image_transform(Image.open(data['im_path']).convert('RGB'))
+        # img = self.image_transform(Image.open(data['im_path']).convert('RGB'))
+        img = Image.open(data['im_path']).convert('RGB')
 
-        if self._split == 'train' and self._train_bbox_jitter:
-            im_h, im_w = img.size()[-2:]
-            data_gt = self.bbox_jitter(data['gt'], im_w, im_h)
+        if self._split == 'train':
+            data_gt = data['gt']
+            if self._random_image_flip:
+                if random() < 0.5:
+                    img = img.transpose(Image.FLIP_LEFT_RIGHT)
+                    im_w, im_h = img.size
+                    data_gt = self.bbox_flip(data_gt, im_w, im_h)
+
+            img = self.image_transform(img)
+
+            if self._train_bbox_jitter:
+                im_h, im_w = img.size()[-2:]
+                data_gt = self.bbox_jitter(data_gt, im_w, im_h)
         else:
+            img = self.image_transform(img)
             data_gt = data['gt']
 
         data = {

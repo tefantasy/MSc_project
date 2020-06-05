@@ -78,7 +78,7 @@ def get_features(obj_detect, img, gts):
 
     return box_features.cpu(), box_head_features.cpu()
 
-def pretrain_main(lr, weight_decay, batch_size, output_dir, ex_name):
+def pretrain_main(conv_only, image_flip, lr, weight_decay, batch_size, output_dir, ex_name):
     torch.manual_seed(12345)
     torch.cuda.manual_seed(12345)
     np.random.seed(12345)
@@ -86,9 +86,17 @@ def pretrain_main(lr, weight_decay, batch_size, output_dir, ex_name):
 
     # output_dir = osp.join(get_output_dir('motion'), 'vis')
     output_dir = osp.join(output_dir, ex_name)
+    log_file = osp.join(output_dir, 'epoch_log.txt')
 
     if not osp.exists(output_dir):
         os.makedirs(output_dir)
+
+    with open(log_file, 'w') as f:
+        f.write('[Experiment name]%s\n\n' % ex_name)
+        f.write('[Parameters]\n')
+        f.write('conv_only=%r\nimage_flip=%r\nlr=%f\nweight_decay=%f\nbatch_size=%d\n\n' % 
+            (conv_only, image_flip, lr, weight_decay, batch_size))
+        f.write('[Loss log]\n')
 
     with open('experiments/cfgs/tracktor.yaml', 'r') as f:
         tracker_config = yaml.safe_load(f)
@@ -96,7 +104,7 @@ def pretrain_main(lr, weight_decay, batch_size, output_dir, ex_name):
     #################
     # Load Datasets #
     #################
-    train_set = MOT17Vis('train', 0.8, 0.0)
+    train_set = MOT17Vis('train', 0.8, 0.0, random_image_flip=image_flip)
     train_loader = DataLoader(train_set, batch_size=1, shuffle=True, num_workers=2)
     val_set = MOT17Vis('val', 0.8, 0.0)
     val_loader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=2)
@@ -110,7 +118,7 @@ def pretrain_main(lr, weight_decay, batch_size, output_dir, ex_name):
     obj_detect.eval()
     obj_detect.cuda()
 
-    vis_model = VisEst()
+    vis_model = VisEst(conv_only=conv_only)
     vis_model.train()
     vis_model.cuda()
 
@@ -194,7 +202,9 @@ def pretrain_main(lr, weight_decay, batch_size, output_dir, ex_name):
 
         mean_val_loss = np.mean(val_loss_iters)
         val_loss_epochs.append(mean_val_loss)
-        print('[Epoch %d] train loss %.6f, val loss %.6f' % (epoch+1, mean_train_loss, mean_val_loss))
+        print('[Epoch %4d] train loss %.6f, val loss %.6f' % (epoch+1, mean_train_loss, mean_val_loss))
+        with open(log_file, 'a') as f:
+            f.write('Epoch %4d: train loss %.6f, val loss %.6f\n' % (epoch+1, mean_train_loss, mean_val_loss))
 
         conv_batch_forger.reset()
         repr_batch_forger.reset()
@@ -214,8 +224,11 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--weight_decay', type=float, default=1e-5)
     parser.add_argument('--batch_size', type=int, default=32)
+
+    parser.add_argument('--full_features', action='store_true')
+    parser.add_argument('--image_flip', action='store_true')
     args = parser.parse_args()
     print(args)
 
 
-    pretrain_main(args.lr, args.weight_decay, args.batch_size, args.output_dir, args.ex_name)
+    pretrain_main(not args.full_features, args.image_flip, args.lr, args.weight_decay, args.batch_size, args.output_dir, args.ex_name)
