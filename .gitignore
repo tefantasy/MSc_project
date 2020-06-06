@@ -18,6 +18,9 @@ motchallenge-devkit
 __pycache__
 *.egg-info
 
+# Results
+*.o*
+
 # MacOSX
 .DS_Store
 ._.DS_Store
