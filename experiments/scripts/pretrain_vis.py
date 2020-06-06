@@ -78,7 +78,7 @@ def get_features(obj_detect, img, gts):
 
     return box_features.cpu(), box_head_features.cpu()
 
-def pretrain_main(conv_only, image_flip, lr, weight_decay, batch_size, output_dir, ex_name):
+def pretrain_main(conv_only, image_flip, train_jitter, val_jitter, lr, weight_decay, batch_size, output_dir, ex_name):
     torch.manual_seed(12345)
     torch.cuda.manual_seed(12345)
     np.random.seed(12345)
@@ -94,8 +94,8 @@ def pretrain_main(conv_only, image_flip, lr, weight_decay, batch_size, output_di
     with open(log_file, 'w') as f:
         f.write('[Experiment name]%s\n\n' % ex_name)
         f.write('[Parameters]\n')
-        f.write('conv_only=%r\nimage_flip=%r\nlr=%f\nweight_decay=%f\nbatch_size=%d\n\n' % 
-            (conv_only, image_flip, lr, weight_decay, batch_size))
+        f.write('conv_only=%r\nimage_flip=%r\ntrain_jitter=%r\nval_jitter=%r\nlr=%f\nweight_decay=%f\nbatch_size=%d\n\n' % 
+            (conv_only, image_flip, train_jitter, val_jitter, lr, weight_decay, batch_size))
         f.write('[Loss log]\n')
 
     with open('experiments/cfgs/tracktor.yaml', 'r') as f:
@@ -104,9 +104,9 @@ def pretrain_main(conv_only, image_flip, lr, weight_decay, batch_size, output_di
     #################
     # Load Datasets #
     #################
-    train_set = MOT17Vis('train', 0.8, 0.0, random_image_flip=image_flip)
+    train_set = MOT17Vis('train', 0.8, 0.0, train_bbox_jitter=train_jitter, random_image_flip=image_flip)
     train_loader = DataLoader(train_set, batch_size=1, shuffle=True, num_workers=2)
-    val_set = MOT17Vis('val', 0.8, 0.0)
+    val_set = MOT17Vis('val', 0.8, 0.0, val_bbox_jitter=val_jitter)
     val_loader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=2)
 
     ########################
@@ -135,7 +135,7 @@ def pretrain_main(conv_only, image_flip, lr, weight_decay, batch_size, output_di
     repr_batch_forger = BatchForger(batch_size, (vis_model.representation_dim,))
     label_batch_forger = BatchForger(batch_size, (1,))
 
-    log_freq = 50
+    log_freq = 100
 
     train_loss_epochs = []
     val_loss_epochs = []
@@ -227,8 +227,13 @@ if __name__ == '__main__':
 
     parser.add_argument('--full_features', action='store_true')
     parser.add_argument('--image_flip', action='store_true')
+    parser.add_argument('--no_jitter', action='store_true')
+    parser.add_argument('--val_jitter', action='store_true')
     args = parser.parse_args()
     print(args)
 
 
-    pretrain_main(not args.full_features, args.image_flip, args.lr, args.weight_decay, args.batch_size, args.output_dir, args.ex_name)
+    pretrain_main(
+        not args.full_features, args.image_flip, not args.no_jitter, args.val_jitter,
+        args.lr, args.weight_decay, args.batch_size, args.output_dir, args.ex_name
+    )

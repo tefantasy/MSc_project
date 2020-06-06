@@ -13,12 +13,13 @@ class MOT17Vis(Dataset):
     """
     Dataset for training visualization prediction sub-module.
     """
-    def __init__(self, split, train_ratio, vis_threshold, train_bbox_jitter=True, random_image_flip=False):
+    def __init__(self, split, train_ratio, vis_threshold, train_bbox_jitter=True, val_bbox_jitter=False, random_image_flip=False):
         train_folders = ['MOT17-02', 'MOT17-04', 'MOT17-05', 'MOT17-09', 'MOT17-10',
                          'MOT17-11', 'MOT17-13']
 
         self._split = split
         self._train_bbox_jitter = train_bbox_jitter
+        self._val_bbox_jitter = val_bbox_jitter
         self._random_image_flip = random_image_flip
 
         self.image_transform = ToTensor()
@@ -112,6 +113,10 @@ class MOT17Vis(Dataset):
         else:
             img = self.image_transform(img)
             data_gt = data['gt']
+            
+            if self._val_bbox_jitter:
+                im_h, im_w = img.size()[-2:]
+                data_gt = self.bbox_jitter(data_gt, im_w, im_h)
 
         data = {
             'img':img,
