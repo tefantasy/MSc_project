@@ -90,11 +90,22 @@ class MOT17TracksWrapper(Dataset):
         return len(self._track_data)
 
     def __getitem__(self, idx):
+        """
+        When fetched with Dataloader:
+        -data:
+            img: (batch, track_len, 3, h, w)
+            gt:  (batch, track_len, 4)
+            vis: (batch, track_len)
+        -label:
+            img: (batch, 3, h, w)
+            gt:  (batch, 4)
+            vis: (batch,)
+        """
         data = self._track_data[idx]
         label = self._track_label[idx]
 
-        data_imgs = [self.image_transform(Image.open(data['im_path'][i]).convert('RGB'))
-                     for i in range(data['last_frame'] - data['start_frame'] + 1)]
+        data_imgs = torch.stack([self.image_transform(Image.open(data['im_path'][i]).convert('RGB'))
+                     for i in range(data['last_frame'] - data['start_frame'] + 1)])
         label_img = self.image_transform(Image.open(label['im_path']).convert('RGB'))
 
         if self._split == 'train' and self.train_bbox_transform is not None:
@@ -104,17 +115,17 @@ class MOT17TracksWrapper(Dataset):
             data_gts = data['gt']
 
         data = {
-            'gt' : data_gts,
+            'gt' : torch.tensor(data_gts, dtype=torch.float32),
             'img' : data_imgs,
-            'vis' : data['vis'],
+            'vis' : torch.tensor(data['vis'], dtype=torch.float32),
             'start_frame' : data['start_frame'],
             'last_frame' : data['last_frame']
         }
 
         label = {
-            'gt' : label['gt'],
+            'gt' : torch.tensor(label['gt'], dtype=torch.float32),
             'img' : label_img,
-            'vis' : label['vis'],
+            'vis' : torch.tensor(label['vis'], dtype=torch.float32),
             'frame' : label['frame']
         }
 
