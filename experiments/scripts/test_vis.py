@@ -41,7 +41,7 @@ obj_detect.eval()
 obj_detect.cuda()
 
 vis_model = VisEst(conv_only=False)
-vis_model.load_state_dict(torch.load(''))
+vis_model.load_state_dict(torch.load('output/tracktor/motion/vis_valjit_flip_fullfeat_l21e-4/vis_model_epoch_94.pth'))
 vis_model.eval()
 vis_model.cuda()
 
