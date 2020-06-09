@@ -14,13 +14,16 @@ class MOT17TracksWrapper(Dataset):
       dataset.
     """
 
-    def __init__(self, split, train_ratio, vis_threshold, input_track_len, keep_short_track=False, train_bbox_transform='jitter'):
-        assert input_track_len > 0, 'Input track length must be greater than zero!'
+    def __init__(self, split, train_ratio, vis_threshold, input_track_len, max_sample_frame, 
+                keep_short_track=False, train_bbox_transform='jitter'):
+        assert max_sample_frame > 0, 'The number of maximum previous frame to be sampled must be greater than zero!'
+        assert input_track_len >= max_sample_frame, 'Input track length must be no less than max_sample_frame!'
 
         train_folders = ['MOT17-02', 'MOT17-04', 'MOT17-05', 'MOT17-09', 'MOT17-10',
                          'MOT17-11', 'MOT17-13']
 
         self._split = split
+        self._max_sample_frame = max_sample_frame
 
         self.image_transform = ToTensor()
         self.train_bbox_transform = self.bbox_jitter if train_bbox_transform == 'jitter' else None
@@ -29,7 +32,7 @@ class MOT17TracksWrapper(Dataset):
         self._track_label = []
 
         for seq_name in train_folders:
-            track_set = MOT17Tracks(seq_name, vis_threshold, input_track_len + 1, keep_short_track)
+            track_set = MOT17Tracks(seq_name, vis_threshold, input_track_len + max_sample_frame, keep_short_track)
             val_start_frame = int(math.floor(track_set._num_frames * train_ratio))
 
             if split == 'train':
@@ -47,22 +50,23 @@ class MOT17TracksWrapper(Dataset):
 
     def get_label_from_track(self, sample):
         """
-        Split the last item from the track sample 
-          as the corresponding label.
+        Split the last max_sample_frame items from the track sample 
+        as the corresponding labels.
         """
         label = {
-            'gt' : sample['gt'][-1],
-            'im_path' : sample['im_path'][-1],
-            'vis' : sample['vis'][-1],
-            'frame' : sample['last_frame']
+            'gt' : sample['gt'][-self._max_sample_frame:],
+            'im_path' : sample['im_path'][-self._max_sample_frame:],
+            'vis' : sample['vis'][-self._max_sample_frame:],
+            'start_frame' : sample['last_frame'] - self._max_sample_frame + 1,
+            'last_frame' : sample['last_frame']
         }
 
         sample = {
-            'gt' : sample['gt'][:-1],
-            'im_path' : sample['im_path'][:-1],
-            'vis' : sample['vis'][:-1],
+            'gt' : sample['gt'][:-self._max_sample_frame],
+            'im_path' : sample['im_path'][:-self._max_sample_frame],
+            'vis' : sample['vis'][:-self._max_sample_frame],
             'start_frame' : sample['start_frame'],
-            'last_frame' : sample['last_frame'] - 1
+            'last_frame' : sample['last_frame'] - self._max_sample_frame
         }
 
         return sample, label
@@ -93,23 +97,24 @@ class MOT17TracksWrapper(Dataset):
         """
         When fetched with Dataloader:
         -data:
-            img: (batch, track_len, 3, h, w)
-            gt:  (batch, track_len, 4)
-            vis: (batch, track_len)
+            img: (batch, input_track_len, 3, h, w)
+            gt:  (batch, input_track_len, 4)
+            vis: (batch, input_track_len)
         -label:
-            img: (batch, 3, h, w)
-            gt:  (batch, 4)
-            vis: (batch,)
+            img: (batch, max_sample_frame, 3, h, w)
+            gt:  (batch, max_sample_frame, 4)
+            vis: (batch, max_sample_frame)
         """
         data = self._track_data[idx]
         label = self._track_label[idx]
 
         data_imgs = torch.stack([self.image_transform(Image.open(data['im_path'][i]).convert('RGB'))
                      for i in range(data['last_frame'] - data['start_frame'] + 1)])
-        label_img = self.image_transform(Image.open(label['im_path']).convert('RGB'))
+        label_imgs = torch.stack([self.image_transform(Image.open(label['im_path'][i]).convert('RGB'))
+                     for i in range(label['last_frame'] - label['start_frame'] + 1)])
 
         if self._split == 'train' and self.train_bbox_transform is not None:
-            im_h, im_w = label_img.size()[-2:]
+            im_h, im_w = data_imgs.size()[-2:]
             data_gts = self.train_bbox_transform(data['gt'], im_w, im_h)
         else:
             data_gts = data['gt']
@@ -124,9 +129,10 @@ class MOT17TracksWrapper(Dataset):
 
         label = {
             'gt' : torch.tensor(label['gt'], dtype=torch.float32),
-            'img' : label_img,
+            'img' : label_imgs,
             'vis' : torch.tensor(label['vis'], dtype=torch.float32),
-            'frame' : label['frame']
+            'start_frame' : label['start_frame'],
+            'last_frame' : label['last_frame']
         }
 
         return data, label
