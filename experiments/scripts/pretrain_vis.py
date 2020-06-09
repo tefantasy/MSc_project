@@ -2,6 +2,7 @@ import os.path as osp
 import os
 import yaml
 import argparse
+import random
 
 import numpy as np
 import torch
@@ -79,6 +80,7 @@ def get_features(obj_detect, img, gts):
     return box_features.cpu(), box_head_features.cpu()
 
 def pretrain_main(conv_only, image_flip, train_jitter, val_jitter, lr, weight_decay, batch_size, output_dir, ex_name):
+    random.seed(12345)
     torch.manual_seed(12345)
     torch.cuda.manual_seed(12345)
     np.random.seed(12345)
