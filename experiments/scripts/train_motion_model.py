@@ -47,7 +47,7 @@ def get_features(obj_detect, img_list, gts):
     return torch.stack(box_features_list, 0), torch.stack(box_head_features_list, 0)
 
 
-def train_main(max_previous_frame, use_ecc, vis_loss_ratio, lr, weight_decay, batch_size, output_dir, ex_name):
+def train_main(max_previous_frame, use_ecc, vis_loss_ratio, lr, weight_decay, batch_size, output_dir, pretrain_vis_path, ex_name):
     random.seed(12345)
     torch.manual_seed(12345)
     torch.cuda.manual_seed(12345)
@@ -90,7 +90,7 @@ def train_main(max_previous_frame, use_ecc, vis_loss_ratio, lr, weight_decay, ba
     obj_detect.cuda()
 
     motion_model = MotionModel(vis_conv_only=False)
-    motion_model.load_vis_pretrained('')
+    motion_model.load_vis_pretrained(pretrain_vis_path)
 
     motion_model.train()
     motion_model.cuda()
@@ -194,6 +194,7 @@ def train_main(max_previous_frame, use_ecc, vis_loss_ratio, lr, weight_decay, ba
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--output_dir', type=str, default='/cs/student/vbox/tianjliu/tracktor_output/motion_model')
+    parser.add_argument('--pretrain_vis_path', type=str, default='/cs/student/vbox/tianjliu/tracktor_output/vis_model_epoch_94.pth')
     parser.add_argument('--ex_name', type=str, default='vis_default')
 
     parser.add_argument('--lr', type=float, default=1e-4)
@@ -208,4 +209,4 @@ if __name__ == '__main__':
     print(args)
 
     train_main(args.max_previous_frame, args.use_ecc, args.vis_loss_ratio, args.lr, args.weight_decay, args.batch_size,
-        args.output_dir, args.ex_name)
+        args.output_dir, args.pretrain_vis_path, args.ex_name)
