@@ -31,7 +31,7 @@ class MotionModel(nn.Module):
         self.appearance_fuse = nn.Linear(2 * representation_dim, representation_dim)
         self.motion_repr = nn.Linear(4, motion_repr_dim)
         self.motion_regress = nn.Sequential(
-            nn.Linear(representation_dim + motion_repr_dim + self.vis_repr_dim, representation_dim + motion_repr_dim + self.vis_repr_dim)
+            nn.Linear(representation_dim + motion_repr_dim + self.vis_repr_dim, representation_dim + motion_repr_dim + self.vis_repr_dim),
             nn.BatchNorm1d(representation_dim + motion_repr_dim + self.vis_repr_dim),
             self.activation,
             nn.Linear(representation_dim + motion_repr_dim + self.vis_repr_dim, motion_repr_dim),

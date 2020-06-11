@@ -208,6 +208,10 @@ class MOT17TracksWrapper(Dataset):
                 label_frame = label['start_frame'] + frame_offset - 1
                 label_seq = label['seq']
 
+                if self._split == 'train' and self.train_bbox_transform is not None:
+                    im_h, im_w = curr_img.size()[-2:]
+                    curr_gt = self.train_bbox_transform([curr_gt], im_w, im_h)[0]
+
                 if self._ecc:
                     prev_curr_identifier = ','.join([prev_seq, str(prev_frame), curr_seq, str(curr_frame)])
                     # if already calculated, just take out
@@ -292,7 +296,7 @@ def tracks_wrapper_collate(batch):
         elif elem.shape == ():  # scalars
             return torch.as_tensor(batch)
     elif isinstance(elem, float):
-        return torch.tensor(batch, dtype=torch.float64)
+        return torch.tensor(batch, dtype=torch.float32)
     elif isinstance(elem, int_classes):
         return torch.tensor(batch)
     elif isinstance(elem, string_classes):

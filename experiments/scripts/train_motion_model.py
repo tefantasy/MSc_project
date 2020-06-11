@@ -10,6 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
+from torchvision.models.detection.transform import resize_boxes
 
 from tracktor.config import get_output_dir
 from tracktor.datasets.mot17_tracks_wrapper import MOT17TracksWrapper, tracks_wrapper_collate
@@ -104,7 +105,7 @@ def train_main(max_previous_frame, use_ecc, vis_loss_ratio, lr, weight_decay, ba
     #######################
 
     max_epochs = 100
-    log_freq = 50
+    log_freq = 25
 
     train_pred_loss_epochs = []
     train_vis_loss_epochs = []
@@ -202,7 +203,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=32)
 
     parser.add_argument('--max_previous_frame', type=int, default=2)
-    parser.add_argument('--vis_loss_ratio', type=float, default=0.1)
+    parser.add_argument('--vis_loss_ratio', type=float, default=1.0)
     parser.add_argument('--use_ecc', action='store_true')
 
     args = parser.parse_args()
