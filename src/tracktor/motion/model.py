@@ -49,13 +49,18 @@ class MotionModel(nn.Module):
     def load_vis_pretrained(self, weight_path):
         self.vis_module.load_state_dict(torch.load(weight_path))
 
-    def forward(self, roi_pool_output, representation_feature, previous_loc, curr_loc):
+    def forward(self, roi_pool_output, representation_feature, previous_loc, curr_loc, curr_loc_warped=None):
         """
         Input and output bboxs (locations) are represented by (x1, y1, x2, y2) coordinates.
+
+        If using ECC, then curr_loc_warped must be provided, and previous_loc should be WARPED previous locations.
         """
         previous_loc_wh = two_p_to_wh(previous_loc)
         curr_loc_wh = two_p_to_wh(curr_loc)
+
         input_motion = encode_motion(previous_loc_wh, curr_loc_wh)
+
+        # main part of the module begins
 
         motion_repr_feature = self.motion_repr(input_motion)
         motion_repr_feature = self.activation(self.bn_motion_input(motion_repr_feature))
@@ -73,8 +78,16 @@ class MotionModel(nn.Module):
         modulator = torch.sigmoid(self.bn_modulate(self.modulate(vis)))
 
         pred_motion = motion_residual * modulator + input_motion
-        pred_loc_wh = decode_motion(pred_motion, curr_loc_wh)
+
+        # main part of the module ends
+
+        if curr_loc_warped is None:
+            pred_loc_wh = decode_motion(pred_motion, curr_loc_wh)
+        else:
+            # use ECC
+            curr_loc_warped_wh = two_p_to_wh(curr_loc_warped)
+            pred_loc_wh = decode_motion(pred_motion, curr_loc_warped_wh)
         pred_loc = wh_to_two_p(pred_loc_wh)
 
-        return pred_loc
+        return pred_loc, vis.squeeze(-1)
 
