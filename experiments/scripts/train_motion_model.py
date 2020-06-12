@@ -2,6 +2,7 @@ import os.path as osp
 import os
 import yaml
 import argparse
+import pickle
 import random
 from random import randint
 
@@ -17,6 +18,9 @@ from tracktor.datasets.mot17_tracks_wrapper import MOT17TracksWrapper, tracks_wr
 
 from tracktor.frcnn_fpn import FRCNN_FPN
 from tracktor.motion.model import MotionModel
+from tracktor.motion.utils import two_p_to_wh
+
+from tracktor.config import cfg
 
 
 def get_features(obj_detect, img_list, gts):
@@ -81,6 +85,12 @@ def train_main(max_previous_frame, use_ecc, vis_loss_ratio, lr, weight_decay, ba
         max_sample_frame=max_previous_frame, get_data_mode='sample'+(',ecc' if use_ecc else ''), tracker_cfg=tracker_config)
     val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False, num_workers=2, collate_fn=tracks_wrapper_collate)
 
+    with open(osp.join(cfg.ROOT_DIR, 'output', 'precomputed_ecc_matrices.pkl'), 'rb') as f:
+        ecc_dict = pickle.load(f)
+
+    train_set.load_precomputed_ecc_warp_matrices(ecc_dict)
+    val_set.load_precomputed_ecc_warp_matrices(ecc_dict)
+
     ########################
     # Initializing Modules #
     ########################
@@ -137,8 +147,10 @@ def train_main(max_previous_frame, use_ecc, vis_loss_ratio, lr, weight_decay, ba
             n_iter += 1
             # TODO the output bbox should be (x,y,w,h)?
             optimizer.zero_grad()
-            pred_loc, vis = motion_model(conv_features, repr_features, prev_loc, curr_loc, curr_loc_warped)
-            pred_loss = pred_loss_func(pred_loc, label_loc)
+            pred_loc_wh, vis = motion_model(conv_features, repr_features, prev_loc, curr_loc, curr_loc_warped)
+            label_loc_wh = two_p_to_wh(label_loc)
+
+            pred_loss = pred_loss_func(pred_loc_wh, label_loc_wh)
             vis_loss = vis_loss_func(vis, curr_vis)
             loss = pred_loss + vis_loss_ratio * vis_loss
 
@@ -169,8 +181,10 @@ def train_main(max_previous_frame, use_ecc, vis_loss_ratio, lr, weight_decay, ba
                 label_loc = label['label_gt'].cuda()
                 curr_vis = data['curr_vis'].cuda()
 
-                pred_loc, vis = motion_model(conv_features, repr_features, prev_loc, curr_loc, curr_loc_warped)
-                pred_loss = pred_loss_func(pred_loc, label_loc)
+                pred_loc_wh, vis = motion_model(conv_features, repr_features, prev_loc, curr_loc, curr_loc_warped)
+                label_loc_wh = two_p_to_wh(label_loc)
+
+                pred_loss = pred_loss_func(pred_loc_wh, label_loc_wh)
                 vis_loss = vis_loss_func(vis, curr_vis)
 
                 val_pred_loss_iters.append(pred_loss.item())

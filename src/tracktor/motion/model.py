@@ -87,7 +87,7 @@ class MotionModel(nn.Module):
             # use ECC
             curr_loc_warped_wh = two_p_to_wh(curr_loc_warped)
             pred_loc_wh = decode_motion(pred_motion, curr_loc_warped_wh)
-        pred_loc = wh_to_two_p(pred_loc_wh)
+        # pred_loc = wh_to_two_p(pred_loc_wh)
 
-        return pred_loc, vis.squeeze(-1)
+        return pred_loc_wh, vis.squeeze(-1)
 

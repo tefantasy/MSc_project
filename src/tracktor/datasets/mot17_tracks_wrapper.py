@@ -78,6 +78,9 @@ class MOT17TracksWrapper(Dataset):
                         self._track_data.append(sample)
                         self._track_label.append(label)
 
+    def load_precomputed_ecc_warp_matrices(self, ecc_dict):
+        self.warp_matrix_buffer = ecc_dict
+
     def get_label_from_track(self, sample):
         """
         Split the last max_sample_frame items from the track sample 
