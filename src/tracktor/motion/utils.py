@@ -33,6 +33,6 @@ def wh_to_two_p(loc):
     loc_x1 = loc[:, [0]] - 0.5 * loc[:, [2]]
     loc_y1 = loc[:, [1]] - 0.5 * loc[:, [3]]
     loc_x2 = loc[:, [0]] + 0.5 * loc[:, [2]] - 1.0
-    loc_y2 = loc[:, [1]] - 0.5 * loc[:, [3]] - 1.0
+    loc_y2 = loc[:, [1]] + 0.5 * loc[:, [3]] - 1.0
 
     return torch.cat([loc_x1, loc_y1, loc_x2, loc_y2], 1)

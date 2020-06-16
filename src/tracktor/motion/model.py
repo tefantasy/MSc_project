@@ -5,13 +5,15 @@ from .visibility import VisEst
 from .utils import encode_motion, decode_motion, two_p_to_wh, wh_to_two_p
 
 class MotionModel(nn.Module):
-    def __init__(self, output_dim=256, pool_size=7, representation_dim=1024, motion_repr_dim=512, vis_conv_only=True):
+    def __init__(self, output_dim=256, pool_size=7, representation_dim=1024, motion_repr_dim=512, vis_conv_only=True, use_modulator=True):
         super(MotionModel, self).__init__()
 
         self.output_dim = output_dim
         self.pool_size = pool_size
         self.representation_dim = representation_dim
         self.vis_repr_dim = representation_dim // 2
+
+        self.use_modulator = use_modulator
 
         self.vis_module = VisEst(output_dim, pool_size, representation_dim, vis_conv_only)
 
@@ -49,11 +51,12 @@ class MotionModel(nn.Module):
     def load_vis_pretrained(self, weight_path):
         self.vis_module.load_state_dict(torch.load(weight_path))
 
-    def forward(self, roi_pool_output, representation_feature, previous_loc, curr_loc, curr_loc_warped=None):
+    def forward(self, roi_pool_output, representation_feature, previous_loc, curr_loc):
         """
         Input and output bboxs (locations) are represented by (x1, y1, x2, y2) coordinates.
 
-        If using ECC, then curr_loc_warped must be provided, and previous_loc should be WARPED previous locations.
+        If using ECC, then curr_loc and previous_loc should be positions WARPED to label_img.
+        We don't check whether ECC is used here. 
         """
         previous_loc_wh = two_p_to_wh(previous_loc)
         curr_loc_wh = two_p_to_wh(curr_loc)
@@ -75,18 +78,18 @@ class MotionModel(nn.Module):
         motion_residual = self.motion_regress(
             torch.cat([appearance_feature, motion_repr_feature, vis_repr_feature], 1))
 
-        modulator = torch.sigmoid(self.bn_modulate(self.modulate(vis)))
 
+        if self.use_modulator:
+            modulator = torch.sigmoid(self.bn_modulate(self.modulate(vis)))
+        else:
+            modulator = vis
+        
         pred_motion = motion_residual * modulator + input_motion
 
         # main part of the module ends
 
-        if curr_loc_warped is None:
-            pred_loc_wh = decode_motion(pred_motion, curr_loc_wh)
-        else:
-            # use ECC
-            curr_loc_warped_wh = two_p_to_wh(curr_loc_warped)
-            pred_loc_wh = decode_motion(pred_motion, curr_loc_warped_wh)
+        pred_loc_wh = decode_motion(pred_motion, curr_loc_wh)
+
         # pred_loc = wh_to_two_p(pred_loc_wh)
 
         return pred_loc_wh, vis.squeeze(-1)

@@ -52,7 +52,7 @@ def get_features(obj_detect, img_list, gts):
     return torch.stack(box_features_list, 0), torch.stack(box_head_features_list, 0)
 
 
-def train_main(max_previous_frame, use_ecc, vis_loss_ratio, lr, weight_decay, batch_size, output_dir, pretrain_vis_path, ex_name):
+def train_main(max_previous_frame, use_ecc, use_modulator, vis_loss_ratio, lr, weight_decay, batch_size, output_dir, pretrain_vis_path, ex_name):
     random.seed(12345)
     torch.manual_seed(12345)
     torch.cuda.manual_seed(12345)
@@ -100,7 +100,7 @@ def train_main(max_previous_frame, use_ecc, vis_loss_ratio, lr, weight_decay, ba
     obj_detect.eval()
     obj_detect.cuda()
 
-    motion_model = MotionModel(vis_conv_only=False)
+    motion_model = MotionModel(vis_conv_only=False, use_modulator=use_modulator)
     motion_model.load_vis_pretrained(pretrain_vis_path)
 
     motion_model.train()
@@ -139,15 +139,14 @@ def train_main(max_previous_frame, use_ecc, vis_loss_ratio, lr, weight_decay, ba
             conv_features, repr_features = get_features(obj_detect, data['curr_img'], data['curr_gt'])
 
             prev_loc = (data['prev_gt_warped'] if use_ecc else data['prev_gt']).cuda()
-            curr_loc = data['curr_gt'].cuda()
-            curr_loc_warped = (data['curr_gt_warped'].cuda() if use_ecc else None)
+            curr_loc = (data['curr_gt_warped'] if use_ecc else data['curr_gt']).cuda()
             label_loc = label['label_gt'].cuda()
             curr_vis = data['curr_vis'].cuda()
 
             n_iter += 1
             # TODO the output bbox should be (x,y,w,h)?
             optimizer.zero_grad()
-            pred_loc_wh, vis = motion_model(conv_features, repr_features, prev_loc, curr_loc, curr_loc_warped)
+            pred_loc_wh, vis = motion_model(conv_features, repr_features, prev_loc, curr_loc)
             label_loc_wh = two_p_to_wh(label_loc)
 
             pred_loss = pred_loss_func(pred_loc_wh, label_loc_wh)
@@ -176,12 +175,11 @@ def train_main(max_previous_frame, use_ecc, vis_loss_ratio, lr, weight_decay, ba
                 conv_features, repr_features = get_features(obj_detect, data['curr_img'], data['curr_gt'])
 
                 prev_loc = (data['prev_gt_warped'] if use_ecc else data['prev_gt']).cuda()
-                curr_loc = data['curr_gt'].cuda()
-                curr_loc_warped = (data['curr_gt_warped'].cuda() if use_ecc else None)
+                curr_loc = (data['curr_gt_warped'] if use_ecc else data['curr_gt']).cuda()
                 label_loc = label['label_gt'].cuda()
                 curr_vis = data['curr_vis'].cuda()
 
-                pred_loc_wh, vis = motion_model(conv_features, repr_features, prev_loc, curr_loc, curr_loc_warped)
+                pred_loc_wh, vis = motion_model(conv_features, repr_features, prev_loc, curr_loc)
                 label_loc_wh = two_p_to_wh(label_loc)
 
                 pred_loss = pred_loss_func(pred_loc_wh, label_loc_wh)
@@ -219,9 +217,11 @@ if __name__ == '__main__':
     parser.add_argument('--max_previous_frame', type=int, default=2)
     parser.add_argument('--vis_loss_ratio', type=float, default=1.0)
     parser.add_argument('--use_ecc', action='store_true')
+    parser.add_argument('--use_modulator', action='store_true')
 
     args = parser.parse_args()
     print(args)
 
-    train_main(args.max_previous_frame, args.use_ecc, args.vis_loss_ratio, args.lr, args.weight_decay, args.batch_size,
+    train_main(args.max_previous_frame, args.use_ecc, args.use_modulator, args.vis_loss_ratio, 
+        args.lr, args.weight_decay, args.batch_size,
         args.output_dir, args.pretrain_vis_path, args.ex_name)

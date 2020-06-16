@@ -22,7 +22,7 @@ class MOT17TracksWrapper(Dataset):
     """
 
     def __init__(self, split, train_ratio, vis_threshold, input_track_len, max_sample_frame, 
-                keep_short_track=False, train_bbox_transform='jitter', get_data_mode='raw', tracker_cfg=None):
+                keep_short_track=False, train_bbox_transform='jitter', get_data_mode='raw', val_sample=True, tracker_cfg=None):
         assert max_sample_frame > 0, 'The number of maximum previous frame to be sampled must be greater than zero!'
         assert input_track_len > max_sample_frame, 'Input track length must be greater than max_sample_frame!'
 
@@ -35,6 +35,7 @@ class MOT17TracksWrapper(Dataset):
         # if False, perform transformations according to flags (e.g., random frame sampling, ECC)
         self._get_raw_data = (get_data_mode == 'raw')
         self._random_frame_sampling = ('sample' in get_data_mode)
+        self._val_sample = val_sample
         self._ecc = ('ecc' in get_data_mode)
 
         if self._ecc:
@@ -191,7 +192,10 @@ class MOT17TracksWrapper(Dataset):
         else:
             # perform transformations according to flags
             if self._random_frame_sampling:
-                frame_offset = randint(1, self._max_sample_frame)
+                if (not self._val_sample) and self._split == 'val':
+                    frame_offset = 1
+                else:
+                    frame_offset = randint(1, self._max_sample_frame)
 
                 prev_gt = data['gt'][-frame_offset - 1]
                 prev_img = self.image_transform(Image.open(data['im_path'][-frame_offset - 1]).convert('RGB'))
@@ -232,6 +236,8 @@ class MOT17TracksWrapper(Dataset):
                         curr_warp_matrix = self.ecc_align(curr_img, label_img)
                         self.warp_matrix_buffer[curr_label_identifier] = curr_warp_matrix
                     curr_gt_warped = self.warp_bbox(curr_gt, curr_warp_matrix)
+                    prev_gt_warped = self.warp_bbox(prev_gt_warped, curr_warp_matrix)
+
                 else:
                     prev_gt_warped, curr_gt_warped = [], []
 
