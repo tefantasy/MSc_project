@@ -87,7 +87,7 @@ def train_main(oracle_training, max_previous_frame, use_ecc, use_modulator, vis_
         max_sample_frame=max_previous_frame, get_data_mode='sample'+(',ecc' if use_ecc else ''), tracker_cfg=tracker_config)
     val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False, num_workers=1, collate_fn=tracks_wrapper_collate)
 
-    with open(osp.join(cfg.ROOT_DIR, 'output', 'precomputed_ecc_matrices.pkl'), 'rb') as f:
+    with open(osp.join(cfg.ROOT_DIR, 'output', 'precomputed_ecc_matrices_3.pkl'), 'rb') as f:
         ecc_dict = pickle.load(f)
 
     train_set.load_precomputed_ecc_warp_matrices(ecc_dict)
