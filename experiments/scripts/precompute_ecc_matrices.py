@@ -30,11 +30,17 @@ def ecc_align(im1, im2):
     return warp_matrix
 
 
+np.random.seed(12345)
+
+max_sample_range = 3
+
 mot17det_train_dir = osp.join(cfg.DATA_DIR, 'MOT17Det', 'train')
-output_path = osp.join(cfg.ROOT_DIR, 'output', 'precomputed_ecc_matrices.pkl')
+output_path = osp.join(cfg.ROOT_DIR, 'output', 'precomputed_ecc_matrices_%d.pkl' % max_sample_range)
 
 train_folders = ['MOT17-02', 'MOT17-04', 'MOT17-05', 'MOT17-09', 'MOT17-10',
                  'MOT17-11', 'MOT17-13']
+
+
 
 
 ecc_dict = {}
@@ -53,41 +59,29 @@ for seq_name in train_folders:
     im_dir = config['Sequence']['imDir']
     im_dir = osp.join(seq_path, im_dir)
 
-    # distance=1
-    for i in range(1, seq_len):
-        frame1, frame2 = i, i + 1
-        im1_path = osp.join(im_dir, "{:06d}.jpg".format(frame1))
-        im2_path = osp.join(im_dir, "{:06d}.jpg".format(frame2))
+    for gap in range(1, max_sample_range + 1):
+        for i in range(1, seq_len + 1 - gap):
+            frame1, frame2 = i, i + gap
+            im1_path = osp.join(im_dir, "{:06d}.jpg".format(frame1))
+            im2_path = osp.join(im_dir, "{:06d}.jpg".format(frame2))
 
-        im1 = image_transform(Image.open(im1_path).convert('RGB'))
-        im2 = image_transform(Image.open(im2_path).convert('RGB'))
+            im1 = image_transform(Image.open(im1_path).convert('RGB'))
+            im2 = image_transform(Image.open(im2_path).convert('RGB'))
 
-        warp_matrix = ecc_align(im1, im2)
-        count += 1
+            warp_matrix = ecc_align(im1, im2)
+            count += 1
 
-        identifier = ','.join([seq_name, str(frame1), seq_name, str(frame2)])
-        ecc_dict[identifier] = warp_matrix
+            identifier = ','.join([seq_name, str(frame1), seq_name, str(frame2)])
 
-        if count % 50 == 0:
-            print(count)
+            assert identifier not in ecc_dict
+            ecc_dict[identifier] = warp_matrix
 
-    # distance=2
-    for i in range(1, seq_len-1):
-        frame1, frame2 = i, i + 2
-        im1_path = osp.join(im_dir, "{:06d}.jpg".format(frame1))
-        im2_path = osp.join(im_dir, "{:06d}.jpg".format(frame2))
+            if count % 50 == 0:
+                print(count)
 
-        im1 = image_transform(Image.open(im1_path).convert('RGB'))
-        im2 = image_transform(Image.open(im2_path).convert('RGB'))
 
-        warp_matrix = ecc_align(im1, im2)
-        count += 1
-
-        identifier = ','.join([seq_name, str(frame1), seq_name, str(frame2)])
-        ecc_dict[identifier] = warp_matrix
-
-        if count % 50 == 0:
-            print(count)
+print('Finished!')
+print(len(ecc_dict))
 
 with open(output_path, 'wb') as f:
     pickle.dump(ecc_dict, f)

@@ -18,6 +18,7 @@ from tracktor.datasets.mot17_tracks_wrapper import MOT17TracksWrapper, tracks_wr
 
 from tracktor.frcnn_fpn import FRCNN_FPN
 from tracktor.motion.model import MotionModel
+from tracktor.motion.vis_oracle_model import VisOracleMotionModel
 from tracktor.motion.utils import two_p_to_wh
 
 from tracktor.config import cfg
@@ -52,7 +53,8 @@ def get_features(obj_detect, img_list, gts):
     return torch.stack(box_features_list, 0), torch.stack(box_head_features_list, 0)
 
 
-def train_main(max_previous_frame, use_ecc, use_modulator, vis_loss_ratio, lr, weight_decay, batch_size, output_dir, pretrain_vis_path, ex_name):
+def train_main(oracle_training, max_previous_frame, use_ecc, use_modulator, vis_loss_ratio, 
+               lr, weight_decay, batch_size, output_dir, pretrain_vis_path, ex_name):
     random.seed(12345)
     torch.manual_seed(12345)
     torch.cuda.manual_seed(12345)
@@ -68,8 +70,8 @@ def train_main(max_previous_frame, use_ecc, use_modulator, vis_loss_ratio, lr, w
     with open(log_file, 'w') as f:
         f.write('[Experiment name]%s\n\n' % ex_name)
         f.write('[Parameters]\n')
-        f.write('max_previous_frame=%d\nuse_ecc=%r\nvis_loss_ratio=%f\nlr=%f\nweight_decay=%f\nbatch_size=%d\n\n' % 
-            (max_previous_frame, use_ecc, vis_loss_ratio, lr, weight_decay, batch_size))
+        f.write('oracle_training=%r\nmax_previous_frame=%d\nuse_ecc=%r\nuse_modulator=%r\nvis_loss_ratio=%f\nlr=%f\nweight_decay=%f\nbatch_size=%d\n\n' % 
+            (oracle_training, max_previous_frame, use_ecc, use_modulator, vis_loss_ratio, lr, weight_decay, batch_size))
         f.write('[Loss log]\n')
 
     with open('experiments/cfgs/tracktor.yaml', 'r') as f:
@@ -78,12 +80,12 @@ def train_main(max_previous_frame, use_ecc, use_modulator, vis_loss_ratio, lr, w
     #################
     # Load Datasets #
     #################
-    train_set = MOT17TracksWrapper('train', 0.8, 0.1, input_track_len=max_previous_frame+1, 
+    train_set = MOT17TracksWrapper('train', 0.8, 0.0, input_track_len=max_previous_frame+1, 
         max_sample_frame=max_previous_frame, get_data_mode='sample'+(',ecc' if use_ecc else ''), tracker_cfg=tracker_config)
-    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=2, collate_fn=tracks_wrapper_collate)
+    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True, num_workers=1, collate_fn=tracks_wrapper_collate)
     val_set = MOT17TracksWrapper('val', 0.8, 0.1, input_track_len=max_previous_frame+1, 
         max_sample_frame=max_previous_frame, get_data_mode='sample'+(',ecc' if use_ecc else ''), tracker_cfg=tracker_config)
-    val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False, num_workers=2, collate_fn=tracks_wrapper_collate)
+    val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=False, num_workers=1, collate_fn=tracks_wrapper_collate)
 
     with open(osp.join(cfg.ROOT_DIR, 'output', 'precomputed_ecc_matrices.pkl'), 'rb') as f:
         ecc_dict = pickle.load(f)
@@ -100,7 +102,10 @@ def train_main(max_previous_frame, use_ecc, use_modulator, vis_loss_ratio, lr, w
     obj_detect.eval()
     obj_detect.cuda()
 
-    motion_model = MotionModel(vis_conv_only=False, use_modulator=use_modulator)
+    if oracle_training:
+        motion_model = VisOracleMotionModel(vis_conv_only=False, use_modulator=use_modulator)
+    else:
+        motion_model = MotionModel(vis_conv_only=False, use_modulator=use_modulator)
     motion_model.load_vis_pretrained(pretrain_vis_path)
 
     motion_model.train()
@@ -146,7 +151,10 @@ def train_main(max_previous_frame, use_ecc, use_modulator, vis_loss_ratio, lr, w
             n_iter += 1
             # TODO the output bbox should be (x,y,w,h)?
             optimizer.zero_grad()
-            pred_loc_wh, vis = motion_model(conv_features, repr_features, prev_loc, curr_loc)
+            if oracle_training:
+                pred_loc_wh, vis = motion_model(conv_features, repr_features, prev_loc, curr_loc, curr_vis.unsqueeze(-1))
+            else:
+                pred_loc_wh, vis = motion_model(conv_features, repr_features, prev_loc, curr_loc)
             label_loc_wh = two_p_to_wh(label_loc)
 
             pred_loss = pred_loss_func(pred_loc_wh, label_loc_wh)
@@ -179,7 +187,10 @@ def train_main(max_previous_frame, use_ecc, use_modulator, vis_loss_ratio, lr, w
                 label_loc = label['label_gt'].cuda()
                 curr_vis = data['curr_vis'].cuda()
 
-                pred_loc_wh, vis = motion_model(conv_features, repr_features, prev_loc, curr_loc)
+                if oracle_training:
+                    pred_loc_wh, vis = motion_model(conv_features, repr_features, prev_loc, curr_loc, curr_vis.unsqueeze(-1))
+                else:
+                    pred_loc_wh, vis = motion_model(conv_features, repr_features, prev_loc, curr_loc)
                 label_loc_wh = two_p_to_wh(label_loc)
 
                 pred_loss = pred_loss_func(pred_loc_wh, label_loc_wh)
@@ -219,9 +230,11 @@ if __name__ == '__main__':
     parser.add_argument('--use_ecc', action='store_true')
     parser.add_argument('--use_modulator', action='store_true')
 
+    parser.add_argument('--oracle_training', action='store_true')
+
     args = parser.parse_args()
     print(args)
 
-    train_main(args.max_previous_frame, args.use_ecc, args.use_modulator, args.vis_loss_ratio, 
+    train_main(args.oracle_training, args.max_previous_frame, args.use_ecc, args.use_modulator, args.vis_loss_ratio, 
         args.lr, args.weight_decay, args.batch_size,
         args.output_dir, args.pretrain_vis_path, args.ex_name)

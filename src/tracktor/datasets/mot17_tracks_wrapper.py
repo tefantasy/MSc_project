@@ -22,9 +22,10 @@ class MOT17TracksWrapper(Dataset):
     """
 
     def __init__(self, split, train_ratio, vis_threshold, input_track_len, max_sample_frame, 
-                keep_short_track=False, train_bbox_transform='jitter', get_data_mode='raw', val_sample=True, tracker_cfg=None):
+                keep_short_track=False, train_bbox_transform='jitter', get_data_mode='raw', val_sample=True, val_frame_gap=1, tracker_cfg=None):
         assert max_sample_frame > 0, 'The number of maximum previous frame to be sampled must be greater than zero!'
         assert input_track_len > max_sample_frame, 'Input track length must be greater than max_sample_frame!'
+        assert val_frame_gap <= max_sample_frame and val_frame_gap >= 1
 
         train_folders = ['MOT17-02', 'MOT17-04', 'MOT17-05', 'MOT17-09', 'MOT17-10',
                          'MOT17-11', 'MOT17-13']
@@ -36,6 +37,7 @@ class MOT17TracksWrapper(Dataset):
         self._get_raw_data = (get_data_mode == 'raw')
         self._random_frame_sampling = ('sample' in get_data_mode)
         self._val_sample = val_sample
+        self._val_frame_gap = val_frame_gap
         self._ecc = ('ecc' in get_data_mode)
 
         if self._ecc:
@@ -193,7 +195,7 @@ class MOT17TracksWrapper(Dataset):
             # perform transformations according to flags
             if self._random_frame_sampling:
                 if (not self._val_sample) and self._split == 'val':
-                    frame_offset = 1
+                    frame_offset = self._val_frame_gap
                 else:
                     frame_offset = randint(1, self._max_sample_frame)
 
