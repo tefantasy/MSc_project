@@ -53,7 +53,7 @@ def get_features(obj_detect, img_list, gts):
     return torch.stack(box_features_list, 0), torch.stack(box_head_features_list, 0)
 
 
-def train_main(oracle_training, max_previous_frame, use_ecc, use_modulator, vis_loss_ratio, 
+def train_main(oracle_training, max_previous_frame, use_ecc, use_modulator, vis_loss_ratio, no_vis_loss,
                lr, weight_decay, batch_size, output_dir, pretrain_vis_path, ex_name):
     random.seed(12345)
     torch.manual_seed(12345)
@@ -70,8 +70,8 @@ def train_main(oracle_training, max_previous_frame, use_ecc, use_modulator, vis_
     with open(log_file, 'w') as f:
         f.write('[Experiment name]%s\n\n' % ex_name)
         f.write('[Parameters]\n')
-        f.write('oracle_training=%r\nmax_previous_frame=%d\nuse_ecc=%r\nuse_modulator=%r\nvis_loss_ratio=%f\nlr=%f\nweight_decay=%f\nbatch_size=%d\n\n' % 
-            (oracle_training, max_previous_frame, use_ecc, use_modulator, vis_loss_ratio, lr, weight_decay, batch_size))
+        f.write('oracle_training=%r\nmax_previous_frame=%d\nuse_ecc=%r\nuse_modulator=%r\nvis_loss_ratio=%f\nno_vis_loss=%r\nlr=%f\nweight_decay=%f\nbatch_size=%d\n\n' % 
+            (oracle_training, max_previous_frame, use_ecc, use_modulator, vis_loss_ratio, no_vis_loss, lr, weight_decay, batch_size))
         f.write('[Loss log]\n')
 
     with open('experiments/cfgs/tracktor.yaml', 'r') as f:
@@ -159,7 +159,10 @@ def train_main(oracle_training, max_previous_frame, use_ecc, use_modulator, vis_
 
             pred_loss = pred_loss_func(pred_loc_wh, label_loc_wh)
             vis_loss = vis_loss_func(vis, curr_vis)
-            loss = pred_loss + vis_loss_ratio * vis_loss
+            if no_vis_loss:
+                loss = pred_loss
+            else:
+                loss = pred_loss + vis_loss_ratio * vis_loss
 
             loss.backward()
             optimizer.step()
@@ -229,12 +232,14 @@ if __name__ == '__main__':
     parser.add_argument('--vis_loss_ratio', type=float, default=1.0)
     parser.add_argument('--use_ecc', action='store_true')
     parser.add_argument('--use_modulator', action='store_true')
+    parser.add_argument('--no_vis_loss', action='store_true')
 
     parser.add_argument('--oracle_training', action='store_true')
 
     args = parser.parse_args()
     print(args)
 
-    train_main(args.oracle_training, args.max_previous_frame, args.use_ecc, args.use_modulator, args.vis_loss_ratio, 
+    train_main(args.oracle_training, args.max_previous_frame, 
+        args.use_ecc, args.use_modulator, args.vis_loss_ratio, args.no_vis_loss,
         args.lr, args.weight_decay, args.batch_size,
         args.output_dir, args.pretrain_vis_path, args.ex_name)
