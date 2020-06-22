@@ -11,49 +11,17 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
-from torchvision.models.detection.transform import resize_boxes
 
 from tracktor.config import get_output_dir
 from tracktor.datasets.mot17_tracks_wrapper import MOT17TracksWrapper, tracks_wrapper_collate
 
 from tracktor.frcnn_fpn import FRCNN_FPN
-from tracktor.motion.model import MotionModel
-from tracktor.motion.vis_oracle_model import VisOracleMotionModel
+from tracktor.motion.backbone_model import BackboneMotionModel
 from tracktor.motion.utils import two_p_to_wh
 
 from tracktor.config import cfg
 
-
-def get_features(obj_detect, img_list, gts):
-    """
-    Input:
-        -img_list: list of (1, 3, w, h). Can be different sizes. 
-        -gts: (batch, 4)
-    Output:
-        -box_features: (batch, 256, 7, 7) CUDA
-        -box_head_features: (batch, 1024) CUDA
-    """
-    box_features_list = []
-    box_head_features_list = []
-
-    with torch.no_grad():
-        gts = gts.cuda()
-        for i, img in enumerate(img_list):
-            obj_detect.load_image(img)
-
-            gt = gts[i].unsqueeze(0)
-            gt = resize_boxes(gt, obj_detect.original_image_sizes[0], obj_detect.preprocessed_images.image_sizes[0])
-            gt = [gt]
-
-            box_features = obj_detect.roi_heads.box_roi_pool(obj_detect.features, gt, obj_detect.preprocessed_images.image_sizes)
-            box_head_features = obj_detect.roi_heads.box_head(box_features)
-            box_features_list.append(box_features.squeeze(0))
-            box_head_features_list.append(box_head_features.squeeze(0))
-
-    return torch.stack(box_features_list, 0), torch.stack(box_head_features_list, 0)
-
-
-def train_main(oracle_training, max_previous_frame, use_ecc, use_modulator, vis_loss_ratio, no_vis_loss,
+def train_main(max_previous_frame, use_ecc, use_modulator, vis_loss_ratio, no_vis_loss,
                lr, weight_decay, batch_size, output_dir, pretrain_vis_path, ex_name):
     random.seed(12345)
     torch.manual_seed(12345)
@@ -70,8 +38,8 @@ def train_main(oracle_training, max_previous_frame, use_ecc, use_modulator, vis_
     with open(log_file, 'w') as f:
         f.write('[Experiment name]%s\n\n' % ex_name)
         f.write('[Parameters]\n')
-        f.write('oracle_training=%r\nmax_previous_frame=%d\nuse_ecc=%r\nuse_modulator=%r\nvis_loss_ratio=%f\nno_vis_loss=%r\nlr=%f\nweight_decay=%f\nbatch_size=%d\n\n' % 
-            (oracle_training, max_previous_frame, use_ecc, use_modulator, vis_loss_ratio, no_vis_loss, lr, weight_decay, batch_size))
+        f.write('max_previous_frame=%d\nuse_ecc=%r\nuse_modulator=%r\nvis_loss_ratio=%f\nno_vis_loss=%r\nlr=%f\nweight_decay=%f\nbatch_size=%d\n\n' % 
+            (max_previous_frame, use_ecc, use_modulator, vis_loss_ratio, no_vis_loss, lr, weight_decay, batch_size))
         f.write('[Loss log]\n')
 
     with open('experiments/cfgs/tracktor.yaml', 'r') as f:
@@ -102,10 +70,7 @@ def train_main(oracle_training, max_previous_frame, use_ecc, use_modulator, vis_
     obj_detect.eval()
     obj_detect.cuda()
 
-    if oracle_training:
-        motion_model = VisOracleMotionModel(vis_conv_only=False, use_modulator=use_modulator)
-    else:
-        motion_model = MotionModel(vis_conv_only=False, use_modulator=use_modulator)
+    motion_model = BackboneMotionModel(tracker_config=tracker_config, vis_conv_only=False, use_modulator=use_modulator)
     motion_model.load_vis_pretrained(pretrain_vis_path)
 
     motion_model.train()
@@ -141,21 +106,21 @@ def train_main(oracle_training, max_previous_frame, use_ecc, use_modulator, vis_
         val_vis_loss_iters = []
 
         for data, label in train_loader:
-            conv_features, repr_features = get_features(obj_detect, data['curr_img'], data['curr_gt'])
+            images = data['curr_img']
+            images = [img.squeeze(0) for img in images]
+
+            target = data['curr_gt']
+            target = [{"boxes": bbox.unsqueeze(0)} for bbox in target]
 
             prev_loc = (data['prev_gt_warped'] if use_ecc else data['prev_gt']).cuda()
             curr_loc = (data['curr_gt_warped'] if use_ecc else data['curr_gt']).cuda()
             label_loc = label['label_gt'].cuda()
             curr_vis = data['curr_vis'].cuda()
+            label_loc_wh = two_p_to_wh(label_loc)
 
             n_iter += 1
-            # TODO the output bbox should be (x,y,w,h)?
             optimizer.zero_grad()
-            if oracle_training:
-                pred_loc_wh, vis = motion_model(conv_features, repr_features, prev_loc, curr_loc, curr_vis.unsqueeze(-1))
-            else:
-                pred_loc_wh, vis = motion_model(conv_features, repr_features, prev_loc, curr_loc)
-            label_loc_wh = two_p_to_wh(label_loc)
+            pred_loc_wh, vis = motion_model(images, target, prev_loc, curr_loc)
 
             pred_loss = pred_loss_func(pred_loc_wh, label_loc_wh)
             vis_loss = vis_loss_func(vis, curr_vis)
@@ -183,19 +148,20 @@ def train_main(oracle_training, max_previous_frame, use_ecc, use_modulator, vis_
 
         with torch.no_grad():
             for data, label in val_loader:
-                conv_features, repr_features = get_features(obj_detect, data['curr_img'], data['curr_gt'])
+                images = data['curr_img']
+                images = [img.squeeze(0) for img in images]
+
+                target = data['curr_gt']
+                target = [{"boxes": bbox.unsqueeze(0)} for bbox in target]
 
                 prev_loc = (data['prev_gt_warped'] if use_ecc else data['prev_gt']).cuda()
                 curr_loc = (data['curr_gt_warped'] if use_ecc else data['curr_gt']).cuda()
                 label_loc = label['label_gt'].cuda()
                 curr_vis = data['curr_vis'].cuda()
-
-                if oracle_training:
-                    pred_loc_wh, vis = motion_model(conv_features, repr_features, prev_loc, curr_loc, curr_vis.unsqueeze(-1))
-                else:
-                    pred_loc_wh, vis = motion_model(conv_features, repr_features, prev_loc, curr_loc)
                 label_loc_wh = two_p_to_wh(label_loc)
 
+                pred_loc_wh, vis = motion_model(images, target, prev_loc, curr_loc)
+                
                 pred_loss = pred_loss_func(pred_loc_wh, label_loc_wh)
                 vis_loss = vis_loss_func(vis, curr_vis)
 
@@ -222,7 +188,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--output_dir', type=str, default='/cs/student/vbox/tianjliu/tracktor_output/motion_model')
     parser.add_argument('--pretrain_vis_path', type=str, default='/cs/student/vbox/tianjliu/tracktor_output/vis_model_epoch_94.pth')
-    parser.add_argument('--ex_name', type=str, default='motion_default')
+    parser.add_argument('--ex_name', type=str, default='backbone_motion_default')
 
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--weight_decay', type=float, default=1e-5)
@@ -234,12 +200,10 @@ if __name__ == '__main__':
     parser.add_argument('--use_modulator', action='store_true')
     parser.add_argument('--no_vis_loss', action='store_true')
 
-    parser.add_argument('--oracle_training', action='store_true')
-
     args = parser.parse_args()
     print(args)
 
-    train_main(args.oracle_training, args.max_previous_frame, 
+    train_main(args.max_previous_frame, 
         args.use_ecc, args.use_modulator, args.vis_loss_ratio, args.no_vis_loss,
         args.lr, args.weight_decay, args.batch_size,
         args.output_dir, args.pretrain_vis_path, args.ex_name)
