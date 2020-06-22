@@ -136,7 +136,8 @@ def train_main(max_previous_frame, use_ecc, use_modulator, vis_loss_ratio, no_vi
             train_vis_loss_iters.append(vis_loss.item())
             if n_iter % log_freq == 0:
                 print('[Train Iter %5d] train pred loss %.6f, vis loss %.6f ...' % 
-                    (n_iter, np.mean(train_pred_loss_iters[n_iter-log_freq:n_iter]), np.mean(train_vis_loss_iters[n_iter-log_freq:n_iter])))
+                    (n_iter, np.mean(train_pred_loss_iters[n_iter-log_freq:n_iter]), np.mean(train_vis_loss_iters[n_iter-log_freq:n_iter])),
+                    flush=True)
 
         mean_train_pred_loss = np.mean(train_pred_loss_iters)
         mean_train_vis_loss = np.mean(train_vis_loss_iters)
