@@ -149,9 +149,9 @@ def train_main(max_previous_frame, use_ecc, use_modulator, vis_loss_ratio, no_vi
         with torch.no_grad():
             for data, label in val_loader:
                 images = data['curr_img']
-                images = [img.squeeze(0) for img in images]
+                images = [img.cuda().squeeze(0) for img in images]
 
-                target = data['curr_gt']
+                target = data['curr_gt'].cuda()
                 target = [{"boxes": bbox.unsqueeze(0)} for bbox in target]
 
                 prev_loc = (data['prev_gt_warped'] if use_ecc else data['prev_gt']).cuda()
