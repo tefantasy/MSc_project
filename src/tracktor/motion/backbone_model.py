@@ -37,8 +37,8 @@ class BackboneMotionModel(MotionModel):
         # chage the structure of targets
         targets = [d['boxes'] for d in targets]
 
-        box_features = self.box_roi_pool(features, targets, images.image_sizes)
-        box_head_features = self.box_head(box_features)
+        roi_pool_output = self.box_roi_pool(features, targets, images.image_sizes)
+        representation_feature = self.box_head(roi_pool_output)
 
         # backbone feature extraction ends
 
