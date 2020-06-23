@@ -77,12 +77,11 @@ def test_motion_model(dataset, tracker_config, use_ecc):
             conv_features, repr_features = get_features(obj_detect, data['curr_img'], data['curr_gt'])
 
             prev_loc = (data['prev_gt_warped'] if use_ecc else data['prev_gt']).cuda()
-            curr_loc = data['curr_gt'].cuda()
-            curr_loc_warped = (data['curr_gt_warped'].cuda() if use_ecc else None)
+            curr_loc = (data['curr_gt_warped'] if use_ecc else data['curr_gt']).cuda()
             label_loc = label['label_gt'].cuda()
             curr_vis = data['curr_vis'].cuda()
 
-            pred_loc_wh, vis = motion_model(conv_features, repr_features, prev_loc, curr_loc, curr_loc_warped)
+            pred_loc_wh, vis = motion_model(conv_features, repr_features, prev_loc, curr_loc)
 
             pred_loc = wh_to_two_p(pred_loc_wh)
             loss = loss_func(pred_loc, label_loc)
@@ -156,10 +155,10 @@ if __name__ == '__main__':
     with open('experiments/cfgs/tracktor.yaml', 'r') as f:
         tracker_config = yaml.safe_load(f)
 
-    val_set = MOT17TracksWrapper('val', 0.8, 0.1, input_track_len=2, 
-        max_sample_frame=1, get_data_mode='sample,ecc', tracker_cfg=tracker_config, val_sample=False)
+    val_set = MOT17TracksWrapper('val', 0.8, 0.1, input_track_len=3, 
+        max_sample_frame=2, get_data_mode='sample,ecc', tracker_cfg=tracker_config, val_sample=False, val_frame_gap=2)
 
-    with open(osp.join(cfg.ROOT_DIR, 'output', 'precomputed_ecc_matrices.pkl'), 'rb') as f:
+    with open(osp.join(cfg.ROOT_DIR, 'output', 'precomputed_ecc_matrices_3.pkl'), 'rb') as f:
         ecc_dict = pickle.load(f)
 
     val_set.load_precomputed_ecc_warp_matrices(ecc_dict)
@@ -168,5 +167,4 @@ if __name__ == '__main__':
 
     # test_motion_model(val_set, tracker_config, use_ecc=True)
 
-    test_tracktor_pp_motion(val_set, tracker_config, use_ecc=True, use_constant_v=True, use_bbox_regression=False)
-    # change motion calculation !!!
+    test_tracktor_pp_motion(val_set, tracker_config, use_ecc=True, use_constant_v=True, use_bbox_regression=True)
