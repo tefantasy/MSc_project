@@ -64,16 +64,17 @@ def train_main(max_previous_frame, use_ecc, use_modulator, vis_loss_ratio, no_vi
     ########################
     # Initializing Modules #
     ########################
-    obj_detect = FRCNN_FPN(num_classes=2)
-    obj_detect.load_state_dict(torch.load(tracker_config['tracktor']['obj_detect_model'],
-                               map_location=lambda storage, loc: storage))
-    obj_detect.eval()
-    obj_detect.cuda()
 
     motion_model = BackboneMotionModel(tracker_config=tracker_config, vis_conv_only=False, use_modulator=use_modulator)
     motion_model.load_vis_pretrained(pretrain_vis_path)
-
     motion_model.train()
+
+    def set_bn_eval(m):
+        classname = m.__class__.__name__
+        if classname.find('BatchNorm') != -1:
+            m.eval()
+    
+    motion_model.backbone.apply(set_bn_eval)
     motion_model.cuda()
 
     optimizer = torch.optim.Adam(motion_model.parameters(), lr=lr, weight_decay=weight_decay)
