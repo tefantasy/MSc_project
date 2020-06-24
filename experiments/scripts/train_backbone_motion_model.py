@@ -185,6 +185,7 @@ def train_main(max_previous_frame, use_ecc, use_modulator, vis_loss_ratio, no_vi
         if mean_val_pred_loss < lowest_val_loss:
             lowest_val_loss, lowest_val_loss_epoch = mean_val_pred_loss, epoch + 1
             torch.save(motion_model.state_dict(), osp.join(output_dir, 'motion_model_epoch_%d.pth'%(epoch+1)))
+        motion_model.backbone.apply(set_bn_eval)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
