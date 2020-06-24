@@ -4,13 +4,14 @@ import torch.nn as nn
 from .visibility import VisEst
 from .utils import encode_motion, decode_motion, two_p_to_wh, wh_to_two_p
 from .model import MotionModel
+from .model_v2 import MotionModelV2
 
 from tracktor.frcnn_fpn import FRCNN_FPN
 
-class BackboneMotionModel(MotionModel):
+class BackboneMotionModel(MotionModelV2):
     def __init__(self, tracker_config, output_dim=256, pool_size=7, representation_dim=1024, motion_repr_dim=512, 
-                 vis_conv_only=True, use_modulator=True):
-        super().__init__(output_dim, pool_size, representation_dim, motion_repr_dim, vis_conv_only, use_modulator)
+                 vis_conv_only=True, use_modulator=True, use_bn=False):
+        super().__init__(output_dim, pool_size, representation_dim, motion_repr_dim, vis_conv_only, use_modulator, use_bn)
 
         obj_detect = FRCNN_FPN(num_classes=2)
         obj_detect.load_state_dict(torch.load(tracker_config['tracktor']['obj_detect_model'],
@@ -47,34 +48,32 @@ class BackboneMotionModel(MotionModel):
 
         input_motion = encode_motion(previous_loc_wh, curr_loc_wh)
 
-        # main part of the module begins
-
-        motion_repr_feature = self.motion_repr(input_motion)
-        motion_repr_feature = self.activation(self.bn_motion_input(motion_repr_feature))
-
+        # appearance #
         spatial_feature = self.appearance_conv(roi_pool_output).squeeze(-1).squeeze(-1)
         appearance_feature = self.appearance_fuse(torch.cat([representation_feature, spatial_feature], 1))
-        appearance_feature = self.activation(self.bn_appearance(appearance_feature))
 
-        vis, vis_repr_feature = self.vis_module(roi_pool_output, representation_feature)
-        vis_repr_feature = self.activation(self.bn_vis_repr(vis_repr_feature))
+        # visibility #
+        vis_spatial_feature = self.vis_conv(roi_pool_output).squeeze(-1).squeeze(-1)
+        vis_feature = self.vis_fuse(torch.cat([representation_feature, vis_spatial_feature], 1))
 
-        motion_residual = self.motion_regress(
-            torch.cat([appearance_feature, motion_repr_feature, vis_repr_feature], 1))
-
-
+        vis_out = torch.sigmoid(self.vis_out(vis_feature))
         if self.use_modulator:
-            modulator = torch.sigmoid(self.bn_modulate(self.modulate(vis)))
+            modulator = self.vis_modulate(vis_feature)
         else:
-            modulator = vis
-        
-        pred_motion = motion_residual * modulator + input_motion
+            modulator = vis_out
 
-        # main part of the module ends
+        # motion #
+        motion_repr_feature = self.motion_repr(input_motion)
+
+        # motion residual prediction #
+        motion_residual = self.motion_regress(
+            torch.cat([appearance_feature, motion_repr_feature, vis_feature], 1)
+        )
+
+        # output #
+        pred_motion = motion_residual * modulator + input_motion
 
         pred_loc_wh = decode_motion(pred_motion, curr_loc_wh)
 
-        # pred_loc = wh_to_two_p(pred_loc_wh)
-
-        return pred_loc_wh, vis.squeeze(-1)
+        return pred_loc_wh, vis_out.squeeze(-1)
 
