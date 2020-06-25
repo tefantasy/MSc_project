@@ -60,7 +60,7 @@ def test_motion_model(dataset, tracker_config, use_ecc):
     obj_detect.cuda()
 
     motion_model = MotionModel(vis_conv_only=False)
-    motion_model.load_state_dict(torch.load('/cs/student/vbox/tianjliu/tracktor_output/motion_model/motion_ecc_ratio2/motion_model_epoch_22.pth'))
+    motion_model.load_state_dict(torch.load('/home/tianjliu/MSc_project/output/tracktor/motion/motion_ecc_ratio2_lr1e-3/motion_model_epoch_28.pth'))
 
     motion_model.eval()
     motion_model.cuda()
@@ -165,6 +165,6 @@ if __name__ == '__main__':
 
 
 
-    # test_motion_model(val_set, tracker_config, use_ecc=True)
+    test_motion_model(val_set, tracker_config, use_ecc=True)
 
-    test_tracktor_pp_motion(val_set, tracker_config, use_ecc=True, use_constant_v=True, use_bbox_regression=True)
+    # test_tracktor_pp_motion(val_set, tracker_config, use_ecc=True, use_constant_v=True, use_bbox_regression=True)
