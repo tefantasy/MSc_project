@@ -51,7 +51,7 @@ def get_features(obj_detect, img_list, gts):
 
 
 def test_motion_model(dataset, tracker_config, use_ecc):
-    val_loader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=2, collate_fn=tracks_wrapper_collate)
+    val_loader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=1, collate_fn=tracks_wrapper_collate)
 
     obj_detect = FRCNN_FPN(num_classes=2)
     obj_detect.load_state_dict(torch.load(tracker_config['tracktor']['obj_detect_model'],
@@ -89,7 +89,7 @@ def test_motion_model(dataset, tracker_config, use_ecc):
             loss_iters.append(loss.item())
 
             if n_iters % 500 == 0:
-                print('Iter %5d/%5d finished. Current loss %.6f.' % (n_iters, total_iters, np.mean(loss_iters)))
+                print('Iter %5d/%5d finished. Current loss %.6f.' % (n_iters, total_iters, np.mean(loss_iters)), flush=True)
 
     mean_loss = np.mean(loss_iters)
     print('\nAll finished! Loss %.6f' % mean_loss)
@@ -97,7 +97,7 @@ def test_motion_model(dataset, tracker_config, use_ecc):
     return mean_loss
 
 def test_tracktor_pp_motion(dataset, tracker_config, use_ecc, use_constant_v, use_bbox_regression):
-    val_loader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=2, collate_fn=tracks_wrapper_collate)
+    val_loader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=1, collate_fn=tracks_wrapper_collate)
 
     if use_bbox_regression:
         obj_detect = FRCNN_FPN(num_classes=2)
@@ -135,7 +135,7 @@ def test_tracktor_pp_motion(dataset, tracker_config, use_ecc, use_constant_v, us
             loss_iters.append(loss.item())
 
             if n_iters % 500 == 0:
-                print('Iter %5d/%5d finished. Current loss %.6f.' % (n_iters, total_iters, np.mean(loss_iters)))
+                print('Iter %5d/%5d finished. Current loss %.6f.' % (n_iters, total_iters, np.mean(loss_iters)), flush=True)
 
     mean_loss = np.mean(loss_iters)
     print('\nAll finished! Loss %.6f' % mean_loss)
