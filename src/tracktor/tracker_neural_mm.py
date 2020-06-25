@@ -78,12 +78,18 @@ class TrackerNeuralMM(object):
         self.track_num += num_new
     
     def check_track_scores(self, blob):
-        """Checks scores of tracks and inactivate low score tracks. Do not regress positions."""
+        """
+        Checks scores of tracks and inactivate low score tracks. 
+        Regress positions for tracks that applied motion the first time.
+        Do not regress positions for other tracks.
+        """
         pos = self.get_pos()
 
-        # CHANGED do not regress pos
-        _, scores = self.obj_detect.predict_boxes(pos)
+        # CHANGED regression strategy
+
+        boxes, scores = self.obj_detect.predict_boxes(pos)
         pos = clip_boxes_to_image(pos, blob['img'].shape[-2:])
+        regress_pos = clip_boxes_to_image(boxes, blob['img'].shape[-2:])
 
         s = []
         for i in range(len(self.tracks) - 1, -1, -1):
@@ -93,7 +99,11 @@ class TrackerNeuralMM(object):
                 self.tracks_to_inactive([t])
             else:
                 s.append(scores[i])
-                t.pos = pos[i].view(1, -1)
+                if t.init_motion:
+                    t.pos = regress_pos[i].view(1, -1)
+                    t.init_motion = False
+                else:
+                    t.pos = pos[i].view(1, -1)
 
         return torch.Tensor(s[::-1]).cuda()
 
@@ -329,7 +339,7 @@ class TrackerNeuralMM(object):
                 self.motion(blob['img'])
                 self.tracks = [t for t in self.tracks if t.has_positive_area()]
 
-            # CHANGED check scores and terminate low score tracks. do not regress positions
+            # CHANGED check scores and terminate low score tracks. only regress positions for the first step.
             self.check_track_scores(blob)
 
             if len(self.tracks):
@@ -416,6 +426,8 @@ class Track(object):
         self.last_pos = deque([pos.clone()], maxlen=mm_steps + 1)
         self.last_v = torch.Tensor([])
         self.gt_id = None
+
+        self.init_motion = True
 
     def has_positive_area(self):
         return self.pos[0, 2] > self.pos[0, 0] and self.pos[0, 3] > self.pos[0, 1]
