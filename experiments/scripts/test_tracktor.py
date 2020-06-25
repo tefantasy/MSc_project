@@ -19,6 +19,8 @@ from tracktor.config import get_output_dir
 from tracktor.datasets.factory import Datasets
 from tracktor.oracle_tracker import OracleTracker
 from tracktor.tracker import Tracker
+from tracktor.tracker_neural_mm import TrackerNeuralMM
+from tracktor.motion.model import MotionModel
 from tracktor.reid.resnet import resnet50
 from tracktor.utils import interpolate, plot_sequence, get_mot_accum, evaluate_mot_accums
 
@@ -70,11 +72,19 @@ def main(tracktor, reid, _config, _log, _run):
     reid_network.eval()
     reid_network.cuda()
 
+    # neural motion model 
+    motion_model = MotionModel(vis_conv_only=False)
+    motion_model.load_state_dict(torch.load('/home/tianjliu/MSc_project/output/tracktor/motion/motion_ecc_ratio2_lr1e-3/motion_model_epoch_28.pth'))
+
+    motion_model.eval()
+    motion_model.cuda()
+
     # tracktor
     if 'oracle' in tracktor:
         tracker = OracleTracker(obj_detect, reid_network, tracktor['tracker'], tracktor['oracle'])
     else:
-        tracker = Tracker(obj_detect, reid_network, tracktor['tracker'])
+        # tracker = Tracker(obj_detect, reid_network, tracktor['tracker'])
+        tracker = TrackerNeuralMM(obj_detect, reid_network, motion_model, tracktor['tracker'])
 
     time_total = 0
     num_frames = 0

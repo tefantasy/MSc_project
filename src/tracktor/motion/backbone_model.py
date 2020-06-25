@@ -22,7 +22,7 @@ class BackboneMotionModel(MotionModelV2):
         self.box_roi_pool = obj_detect.roi_heads.box_roi_pool
         self.box_head = obj_detect.roi_heads.box_head
 
-    def forward(self, images, targets, previous_loc, curr_loc):
+    def forward(self, images, targets, previous_loc, curr_loc, output_motion=False):
         """
         images: list of image tensors (c, w, h), can be of different shapes.
         targets: list of dicts, where the mandatory fields of the dicts are:
@@ -75,5 +75,8 @@ class BackboneMotionModel(MotionModelV2):
 
         pred_loc_wh = decode_motion(pred_motion, curr_loc_wh)
 
-        return pred_loc_wh, vis_out.squeeze(-1)
+        if output_motion:
+            return pred_motion
+        else:
+            return pred_loc_wh, vis_out.squeeze(-1)
 
