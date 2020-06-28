@@ -17,7 +17,7 @@ from tracktor.datasets.mot17_tracks_wrapper import MOT17TracksWrapper, tracks_wr
 
 from tracktor.frcnn_fpn import FRCNN_FPN
 from tracktor.motion.backbone_model import BackboneMotionModel
-from tracktor.motion.utils import two_p_to_wh
+from tracktor.motion.utils import two_p_to_wh, bbox_jitter
 
 from tracktor.config import cfg
 
@@ -110,7 +110,12 @@ def train_main(max_previous_frame, use_ecc, use_modulator, use_bn, vis_loss_rati
             images = data['curr_img']
             images = [img.cuda().squeeze(0) for img in images]
 
-            target = data['curr_gt'].cuda()
+            # jitter target for getting roi features
+            im_w = torch.tensor([img.size()[-1] for img in data['curr_img']], dtype=data['curr_gt'].dtype)
+            im_h = torch.tensor([img.size()[-2] for img in data['curr_img']], dtype=data['curr_gt'].dtype)
+            jittered_curr_gt = bbox_jitter(data['curr_gt'].clone(), im_w, im_h)
+
+            target = jittered_curr_gt.cuda()
             target = [{"boxes": bbox.unsqueeze(0)} for bbox in target]
 
             prev_loc = (data['prev_gt_warped'] if use_ecc else data['prev_gt']).cuda()
@@ -153,6 +158,7 @@ def train_main(max_previous_frame, use_ecc, use_modulator, use_bn, vis_loss_rati
                 images = data['curr_img']
                 images = [img.cuda().squeeze(0) for img in images]
 
+                # do not jitter for validation
                 target = data['curr_gt'].cuda()
                 target = [{"boxes": bbox.unsqueeze(0)} for bbox in target]
 

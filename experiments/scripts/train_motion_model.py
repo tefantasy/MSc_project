@@ -20,7 +20,7 @@ from tracktor.frcnn_fpn import FRCNN_FPN
 from tracktor.motion.model import MotionModel
 from tracktor.motion.model_v2 import MotionModelV2
 from tracktor.motion.vis_oracle_model import VisOracleMotionModel
-from tracktor.motion.utils import two_p_to_wh
+from tracktor.motion.utils import two_p_to_wh, bbox_jitter
 
 from tracktor.config import cfg
 
@@ -143,8 +143,14 @@ def train_main(oracle_training, max_previous_frame, use_ecc, use_modulator, use_
         val_vis_loss_iters = []
 
         for data, label in train_loader:
-            conv_features, repr_features = get_features(obj_detect, data['curr_img'], data['curr_gt'])
+            # jitter bboxs for getting roi features
+            im_w = torch.tensor([img.size()[-1] for img in data['curr_img']], dtype=data['curr_gt'].dtype)
+            im_h = torch.tensor([img.size()[-2] for img in data['curr_img']], dtype=data['curr_gt'].dtype)
+            jittered_curr_gt = bbox_jitter(data['curr_gt'].clone(), im_w, im_h)
 
+            conv_features, repr_features = get_features(obj_detect, data['curr_img'], jittered_curr_gt)
+
+            # for motion calculation, we still use the unjittered bboxs
             prev_loc = (data['prev_gt_warped'] if use_ecc else data['prev_gt']).cuda()
             curr_loc = (data['curr_gt_warped'] if use_ecc else data['curr_gt']).cuda()
             label_loc = label['label_gt'].cuda()
@@ -185,6 +191,7 @@ def train_main(oracle_training, max_previous_frame, use_ecc, use_modulator, use_
 
         with torch.no_grad():
             for data, label in val_loader:
+                # do not jitter for validation
                 conv_features, repr_features = get_features(obj_detect, data['curr_img'], data['curr_gt'])
 
                 prev_loc = (data['prev_gt_warped'] if use_ecc else data['prev_gt']).cuda()

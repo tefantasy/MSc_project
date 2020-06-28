@@ -25,8 +25,9 @@ class BackboneMotionModel(MotionModelV2):
     def forward(self, images, targets, previous_loc, curr_loc, output_motion=False):
         """
         images: list of image tensors (c, w, h), can be of different shapes.
-        targets: list of dicts, where the mandatory fields of the dicts are:
+        targets: for getting roi features. list of dicts, where the mandatory fields of the dicts are:
                  -"boxes": coordinate of boxes in (x1, y1, x2, y2) to be roi-pooled, shape (1, 4). 
+        *_loc: for calculating motion.
         """
 
         images, targets = self.transform(images, targets)
