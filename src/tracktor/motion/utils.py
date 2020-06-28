@@ -40,7 +40,7 @@ def wh_to_two_p(loc):
 
 
 
-def bbox_jitter(self, bboxs, im_w, im_h):
+def bbox_jitter(bboxs, im_w, im_h):
     """
     Input:
         -bboxs: Tensor of (N, 4)
