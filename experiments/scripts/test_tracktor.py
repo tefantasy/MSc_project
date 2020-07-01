@@ -20,7 +20,7 @@ from tracktor.datasets.factory import Datasets
 from tracktor.oracle_tracker import OracleTracker
 from tracktor.tracker import Tracker
 from tracktor.tracker_neural_mm import TrackerNeuralMM
-from tracktor.motion.model import MotionModel
+from tracktor.motion.model_v2 import MotionModelV2
 from tracktor.reid.resnet import resnet50
 from tracktor.utils import interpolate, plot_sequence, get_mot_accum, evaluate_mot_accums
 
@@ -73,8 +73,8 @@ def main(tracktor, reid, _config, _log, _run):
     reid_network.cuda()
 
     # neural motion model 
-    motion_model = MotionModel(vis_conv_only=False)
-    motion_model.load_state_dict(torch.load('/home/tianjliu/MSc_project/output/tracktor/motion/motion_ecc_ratio2_lr1e-3/motion_model_epoch_28.pth'))
+    motion_model = MotionModelV2(vis_conv_only=False, use_modulator=False, use_bn=False)
+    motion_model.load_state_dict(torch.load('/home/tianjliu/MSc_project/output/tracktor/motion/motion_ecc_novisloss_nomod_nobn_jitter/motion_model_epoch_5.pth'))
 
     motion_model.eval()
     motion_model.cuda()
