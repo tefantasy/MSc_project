@@ -5,7 +5,7 @@ from .utils import encode_motion, decode_motion, two_p_to_wh, wh_to_two_p
 
 class MotionModelV2(nn.Module):
     def __init__(self, output_dim=256, pool_size=7, representation_dim=1024, motion_repr_dim=512, 
-                 vis_conv_only=True, use_modulator=True, use_bn=False):
+                 vis_conv_only=True, use_modulator=True, use_bn=False, use_residual=True):
         super(MotionModelV2, self).__init__()
 
         self.output_dim = output_dim
@@ -15,6 +15,7 @@ class MotionModelV2(nn.Module):
 
         self.use_modulator = use_modulator
         self.use_bn = use_bn
+        self.use_residual = use_residual
 
         self.activation = nn.ReLU()
 
@@ -52,11 +53,17 @@ class MotionModelV2(nn.Module):
                 nn.BatchNorm1d(self.vis_repr_dim), self.activation
             )
             self.vis_out = nn.Linear(self.vis_repr_dim, 1)
-            if use_modulator:
-                self.vis_modulate = nn.Sequential(
-                    nn.Linear(self.vis_repr_dim, 4),
-                    nn.Sigmoid()
-                )
+            if use_residual:
+                if use_modulator:
+                    self.vis_modulate = nn.Sequential(
+                        nn.Linear(self.vis_repr_dim, 4),
+                        nn.Sigmoid()
+                    )
+                else:
+                    self.vis_modulate = nn.Sequential(
+                        nn.Linear(self.vis_repr_dim, 1),
+                        nn.Sigmoid()
+                    )
             # motion branch #
             self.motion_repr = nn.Sequential(
                 nn.Linear(4, motion_repr_dim),
@@ -100,11 +107,17 @@ class MotionModelV2(nn.Module):
                 self.activation
             )
             self.vis_out = nn.Linear(self.vis_repr_dim, 1)
-            if use_modulator:
-                self.vis_modulate = nn.Sequential(
-                    nn.Linear(self.vis_repr_dim, 4),
-                    nn.Sigmoid()
-                )
+            if use_residual:
+                if use_modulator:
+                    self.vis_modulate = nn.Sequential(
+                        nn.Linear(self.vis_repr_dim, 4),
+                        nn.Sigmoid()
+                    )
+                else:
+                    self.vis_modulate = nn.Sequential(
+                        nn.Linear(self.vis_repr_dim, 1),
+                        nn.Sigmoid()
+                    )
             # motion branch #
             self.motion_repr = nn.Sequential(
                 nn.Linear(4, motion_repr_dim),
@@ -140,10 +153,10 @@ class MotionModelV2(nn.Module):
         vis_feature = self.vis_fuse(torch.cat([representation_feature, vis_spatial_feature], 1))
 
         vis_out = torch.sigmoid(self.vis_out(vis_feature))
-        if self.use_modulator:
+
+        if self.use_residual:
             modulator = self.vis_modulate(vis_feature)
-        else:
-            modulator = vis_out
+
 
         # motion #
         motion_repr_feature = self.motion_repr(input_motion)
@@ -154,7 +167,10 @@ class MotionModelV2(nn.Module):
         )
 
         # output #
-        pred_motion = motion_residual * modulator + input_motion
+        if self.use_residual:
+            pred_motion = motion_residual * modulator + input_motion
+        else:
+            pred_motion = motion_residual
 
         pred_loc_wh = decode_motion(pred_motion, curr_loc_wh)
 

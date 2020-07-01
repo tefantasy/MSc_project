@@ -55,7 +55,7 @@ def get_features(obj_detect, img_list, gts):
     return torch.stack(box_features_list, 0), torch.stack(box_head_features_list, 0)
 
 
-def train_main(oracle_training, no_visrepr, max_previous_frame, use_ecc, use_modulator, use_bn, vis_loss_ratio, no_vis_loss,
+def train_main(oracle_training, no_visrepr, max_previous_frame, use_ecc, use_modulator, use_bn, use_residual, vis_loss_ratio, no_vis_loss,
                lr, weight_decay, batch_size, output_dir, pretrain_vis_path, ex_name):
     random.seed(12345)
     torch.manual_seed(12345)
@@ -72,8 +72,8 @@ def train_main(oracle_training, no_visrepr, max_previous_frame, use_ecc, use_mod
     with open(log_file, 'w') as f:
         f.write('[Experiment name]%s\n\n' % ex_name)
         f.write('[Parameters]\n')
-        f.write('oracle_training=%r\nno_visrepr=%r\nmax_previous_frame=%d\nuse_ecc=%r\nuse_modulator=%r\nuse_bn%r\nvis_loss_ratio=%f\nno_vis_loss=%r\nlr=%f\nweight_decay=%f\nbatch_size=%d\n\n' % 
-            (oracle_training, no_visrepr, max_previous_frame, use_ecc, use_modulator, use_bn, vis_loss_ratio, no_vis_loss, lr, weight_decay, batch_size))
+        f.write('oracle_training=%r\nno_visrepr=%r\nmax_previous_frame=%d\nuse_ecc=%r\nuse_modulator=%r\nuse_bn=%r\nuse_residual=%r\nvis_loss_ratio=%f\nno_vis_loss=%r\nlr=%f\nweight_decay=%f\nbatch_size=%d\n\n' % 
+            (oracle_training, no_visrepr, max_previous_frame, use_ecc, use_modulator, use_bn, use_residual, vis_loss_ratio, no_vis_loss, lr, weight_decay, batch_size))
         f.write('[Loss log]\n')
 
     with open('experiments/cfgs/tracktor.yaml', 'r') as f:
@@ -110,7 +110,7 @@ def train_main(oracle_training, no_visrepr, max_previous_frame, use_ecc, use_mod
         if no_visrepr:
             motion_model = MotionModelNoVisRepr(vis_conv_only=False, use_modulator=use_modulator, use_bn=use_bn)
         else:
-            motion_model = MotionModelV2(vis_conv_only=False, use_modulator=use_modulator, use_bn=use_bn)
+            motion_model = MotionModelV2(vis_conv_only=False, use_modulator=use_modulator, use_bn=use_bn, use_residual=use_residual)
     # motion_model.load_vis_pretrained(pretrain_vis_path)
 
     motion_model.train()
@@ -246,6 +246,7 @@ if __name__ == '__main__':
     parser.add_argument('--use_ecc', action='store_true')
     parser.add_argument('--use_modulator', action='store_true')
     parser.add_argument('--use_bn', action='store_true')
+    parser.add_argument('--use_residual', action='store_true')
     parser.add_argument('--no_vis_loss', action='store_true')
     parser.add_argument('--no_visrepr', action='store_true')
 
@@ -255,6 +256,6 @@ if __name__ == '__main__':
     print(args)
 
     train_main(args.oracle_training, args.no_visrepr, args.max_previous_frame, 
-        args.use_ecc, args.use_modulator, args.use_bn, args.vis_loss_ratio, args.no_vis_loss,
+        args.use_ecc, args.use_modulator, args.use_bn, args.use_residual, args.vis_loss_ratio, args.no_vis_loss,
         args.lr, args.weight_decay, args.batch_size,
         args.output_dir, args.pretrain_vis_path, args.ex_name)
