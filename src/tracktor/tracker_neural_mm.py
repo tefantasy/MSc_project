@@ -283,7 +283,7 @@ class TrackerNeuralMM(object):
         if self.do_reid:
             for t in self.inactive_tracks:
                 if t.last_v.nelement() > 0:
-                    self.motion_step(t)
+                    t.pos = t.pos + t.last_v
 
     def step(self, blob):
         """This function should be called every timestep to perform tracking with a blob
