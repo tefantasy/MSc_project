@@ -275,7 +275,7 @@ class TrackerNeuralMM(object):
         pred_pos_wh = decode_motion(pred_motion, pos_wh)
         pred_pos = wh_to_two_p(pred_pos_wh)
 
-        for i in len(self.tracks):
+        for i in range(len(self.tracks)):
             self.tracks[i].last_v = pred_pos[i].unsqueeze(0) - self.tracks[i].pos
             self.tracks[i].pos = pred_pos[i].unsqueeze(0)
 
