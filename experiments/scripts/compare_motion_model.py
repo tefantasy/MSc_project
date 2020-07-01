@@ -15,7 +15,7 @@ from torchvision.models.detection.transform import resize_boxes
 from tracktor.datasets.mot17_tracks_wrapper import MOT17TracksWrapper, tracks_wrapper_collate
 
 from tracktor.frcnn_fpn import FRCNN_FPN
-from tracktor.motion.model import MotionModel
+from tracktor.motion.model_v2 import MotionModelV2
 from tracktor.motion.utils import two_p_to_wh, wh_to_two_p
 
 from tracktor.config import cfg
@@ -59,8 +59,8 @@ def test_motion_model(dataset, tracker_config, use_ecc):
     obj_detect.eval()
     obj_detect.cuda()
 
-    motion_model = MotionModel(vis_conv_only=False)
-    motion_model.load_state_dict(torch.load('/home/tianjliu/MSc_project/output/tracktor/motion/motion_ecc_ratio2_lr1e-3/motion_model_epoch_28.pth'))
+    motion_model = MotionModelV2(vis_conv_only=False, use_modulator=False, use_bn=False)
+    motion_model.load_state_dict(torch.load('/home/tianjliu/MSc_project/output/tracktor/motion/motion_ecc_novisloss_nomod_nobn_jitter/motion_model_epoch_5.pth'))
 
     motion_model.eval()
     motion_model.cuda()
@@ -145,6 +145,11 @@ def test_tracktor_pp_motion(dataset, tracker_config, use_ecc, use_constant_v, us
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--gap', type=int, default=1)
+
+    args = parser.parse_args()
+
     random.seed(12345)
     torch.manual_seed(12345)
     torch.cuda.manual_seed(12345)
@@ -155,8 +160,8 @@ if __name__ == '__main__':
     with open('experiments/cfgs/tracktor.yaml', 'r') as f:
         tracker_config = yaml.safe_load(f)
 
-    val_set = MOT17TracksWrapper('val', 0.8, 0.1, input_track_len=3, 
-        max_sample_frame=2, get_data_mode='sample,ecc', tracker_cfg=tracker_config, val_sample=False, val_frame_gap=2)
+    val_set = MOT17TracksWrapper('val', 0.8, 0.1, input_track_len=args.gap+1, 
+        max_sample_frame=args.gap, get_data_mode='sample,ecc', tracker_cfg=tracker_config, val_sample=False, val_frame_gap=args.gap)
 
     with open(osp.join(cfg.ROOT_DIR, 'output', 'precomputed_ecc_matrices_3.pkl'), 'rb') as f:
         ecc_dict = pickle.load(f)
