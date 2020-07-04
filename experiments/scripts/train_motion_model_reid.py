@@ -400,4 +400,25 @@ def train_main(use_ecc, use_modulator, use_bn, use_residual, use_reid_distance, 
             torch.save(motion_model.state_dict(), osp.join(output_dir, 'reid_motion_model_epoch_%d.pth'%(epoch+1)))
 
 if __name__ == '__main__':
-    train_main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--output_dir', type=str, default='/cs/student/vbox/tianjliu/tracktor_output/motion_model')
+    parser.add_argument('--ex_name', type=str, default='reid_motion_default')
+
+    parser.add_argument('--lr', type=float, default=1e-4)
+    parser.add_argument('--weight_decay', type=float, default=1e-5)
+    parser.add_argument('--batch_size', type=int, default=32)
+
+    parser.add_argument('--use_ecc', action='store_true')
+    parser.add_argument('--use_modulator', action='store_true')
+    parser.add_argument('--use_bn', action='store_true')
+    parser.add_argument('--use_residual', action='store_true')
+    parser.add_argument('--use_reid_distance', action='store_true')
+    parser.add_argument('--vis_loss_ratio', type=float, default=1.0)
+    parser.add_argument('--no_vis_loss', action='store_true')
+
+    args = parser.parse_args()
+    print(args)
+
+    train_main(args.use_ecc, args.use_modulator, args.use_bn, args.use_residual, args.use_reid_distance, 
+               args.vis_loss_ratio, args.no_vis_loss,
+               args.lr, args.weight_decay, args.batch_size, args.output_dir, args.ex_name)
