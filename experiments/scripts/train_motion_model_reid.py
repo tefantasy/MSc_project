@@ -316,7 +316,7 @@ def train_main(use_ecc, use_modulator, use_bn, use_residual, use_reid_distance, 
             prev_loc = (data['prev_gt_warped'] if use_ecc else data['prev_gt']).cuda()
             curr_loc = (data['curr_gt_warped'] if use_ecc else data['curr_gt']).cuda()
             curr_vis = data['curr_vis'].cuda()
-            label_loc = label['label_gt'].cuda()
+            label_loc = data['label_gt'].cuda()
 
             batch_manager.feed((historical_reid, curr_reid, conv_features, repr_features, prev_loc, curr_loc, curr_vis, label_loc))
 
@@ -364,7 +364,7 @@ def train_main(use_ecc, use_modulator, use_bn, use_residual, use_reid_distance, 
                 prev_loc = (data['prev_gt_warped'] if use_ecc else data['prev_gt']).cuda()
                 curr_loc = (data['curr_gt_warped'] if use_ecc else data['curr_gt']).cuda()
                 curr_vis = data['curr_vis'].cuda()
-                label_loc = label['label_gt'].cuda()
+                label_loc = data['label_gt'].cuda()
 
                 batch_manager.feed((historical_reid, curr_reid, conv_features, repr_features, prev_loc, curr_loc, curr_vis, label_loc))
 
