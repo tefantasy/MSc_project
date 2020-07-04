@@ -188,7 +188,7 @@ class MotionModelReID(nn.Module):
         for historical_reid_feature in historical_reid:
             weighted_historical_feature = historical_reid_feature * self.temporal_reid_weight.expand(historical_reid_feature.size()[0], -1)
             dotted_feature = torch.sum(weighted_historical_feature, dim=1)
-            coeff = F.softmax(dotted_feature).unsqueeze(-1)
+            coeff = F.softmax(dotted_feature, dim=0).unsqueeze(-1)
             weighted_feature = torch.sum(coeff * historical_reid_feature, dim=0)
             batch_weighted_reid.append(weighted_feature)
         reid_feature = torch.stack(batch_weighted_reid, 0) # (batch, reid_dim)

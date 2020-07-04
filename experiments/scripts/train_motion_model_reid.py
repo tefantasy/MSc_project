@@ -153,6 +153,44 @@ def get_batch_reid_features(reid_model, img_list, batch_history):
             for i in range(len(frame_ind)):
                 img, pos = imgs[i], gts[i]
 
+                try:
+                    x0 = int(pos[0])
+                    y0 = int(pos[1])
+                    x1 = int(pos[2])
+                    y1 = int(pos[3])
+                    if x0 == x1:
+                        if x0 != 0:
+                            x0 -= 1
+                        else:
+                            x1 += 1
+                    if y0 == y1:
+                        if y0 != 0:
+                            y0 -= 1
+                        else:
+                            y1 += 1
+                    img = img[:, y0:y1, x0:x1]
+                    img = trans(img)
+                    img_patches.append(img)
+                except Exception:
+                    print('Error!')
+                    print(img.size(), pos)
+                    exit(1)
+            img_patches = torch.stack(img_patches, 0).cuda()
+
+            reid_features = reid_model(img_patches)
+            batch_features.append(reid_features)
+    return batch_features
+
+def get_curr_reid_features(reid_model, img_list, curr_frame_offset, curr_gt_app):
+    trans = Compose([ToPILImage(), Resize((256,128)), ToTensor()])
+
+    img_patches = []
+    with torch.no_grad():
+        for i, frame_idx in enumerate(curr_frame_offset):
+            img = img_list[frame_idx]
+            pos = curr_gt_app[i]
+
+            try:
                 x0 = int(pos[0])
                 y0 = int(pos[1])
                 x1 = int(pos[2])
@@ -170,38 +208,10 @@ def get_batch_reid_features(reid_model, img_list, batch_history):
                 img = img[:, y0:y1, x0:x1]
                 img = trans(img)
                 img_patches.append(img)
-            img_patches = torch.stack(img_patches, 0).cuda()
-
-            reid_features = reid_model(img_patches)
-            batch_features.append(reid_features)
-    return batch_features
-
-def get_curr_reid_features(reid_model, img_list, curr_frame_offset, curr_gt_app):
-    trans = Compose([ToPILImage(), Resize((256,128)), ToTensor()])
-
-    img_patches = []
-    with torch.no_grad():
-        for i, frame_idx in enumerate(curr_frame_offset):
-            img = img_list[frame_idx]
-            pos = curr_gt_app[i]
-
-            x0 = int(pos[0])
-            y0 = int(pos[1])
-            x1 = int(pos[2])
-            y1 = int(pos[3])
-            if x0 == x1:
-                if x0 != 0:
-                    x0 -= 1
-                else:
-                    x1 += 1
-            if y0 == y1:
-                if y0 != 0:
-                    y0 -= 1
-                else:
-                    y1 += 1
-            img = img[:, y0:y1, x0:x1]
-            img = trans(img)
-            img_patches.append(img)
+            except Exception:
+                print('Error!')
+                print(img.size(), pos)
+                exit(1)
         img_patches = torch.stack(img_patches, 0).cuda()
 
         reid_features = reid_model(img_patches)
