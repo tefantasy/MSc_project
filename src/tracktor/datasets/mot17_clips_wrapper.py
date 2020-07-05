@@ -42,7 +42,7 @@ class MOT17ClipsWrapper(Dataset):
     def load_precomputed_ecc_warp_matrices(self, ecc_dict):
         self.warp_matrix_buffer = ecc_dict
 
-    def bbox_jitter(self, bboxs, im_w, im_h, noise_scale=0.05):
+    def bbox_jitter(self, bboxs, im_w, im_h, noise_scale=0.05, clip=True):
         double_noise_scale = 2 * noise_scale
 
         bboxs = np.array(bboxs, dtype=np.float32)
@@ -54,6 +54,17 @@ class MOT17ClipsWrapper(Dataset):
         bboxs[:, 2] += np.clip(np.random.normal(0.0, bbox_w * noise_scale), -bbox_w * double_noise_scale, bbox_w * double_noise_scale)
         bboxs[:, 1] += np.clip(np.random.normal(0.0, bbox_h * noise_scale), -bbox_h * double_noise_scale, bbox_h * double_noise_scale)
         bboxs[:, 3] += np.clip(np.random.normal(0.0, bbox_h * noise_scale), -bbox_h * double_noise_scale, bbox_h * double_noise_scale)
+
+        if clip:
+            bboxs[:, 0] = np.clip(bboxs[:, 0], 0, im_w - 1)
+            bboxs[:, 1] = np.clip(bboxs[:, 1], 0, im_h - 1)
+            bboxs[:, 2] = np.clip(bboxs[:, 2], 0, im_w - 1)
+            bboxs[:, 3] = np.clip(bboxs[:, 3], 0, im_h - 1)
+
+        return bboxs
+
+    def bbox_clip_to_image(self, bboxs, im_w, im_h):
+        bboxs = np.array(bboxs, dtype=np.float32)
 
         bboxs[:, 0] = np.clip(bboxs[:, 0], 0, im_w - 1)
         bboxs[:, 1] = np.clip(bboxs[:, 1], 0, im_h - 1)
@@ -108,6 +119,8 @@ class MOT17ClipsWrapper(Dataset):
             historical_gt = track['gt'][:-2]
             if self.is_train and self.train_jitter:
                 historical_gt = self.bbox_jitter(historical_gt, im_w, im_h, noise_scale=0.05)
+            else:
+                historical_gt = self.bbox_clip_to_image(historical_gt, im_w, im_h)
             historical = {
                 'gt': torch.tensor(historical_gt, dtype=torch.float32),
                 'frame_offset': torch.tensor(track['frame_offset'][:-2], dtype=torch.long),
@@ -127,11 +140,10 @@ class MOT17ClipsWrapper(Dataset):
             label_vis = track['vis'][-1]
 
             if self.is_train and self.train_jitter:
-                curr_gt_motion = self.bbox_jitter([curr_gt], im_w, im_h, noise_scale=0.03)[0]
                 curr_gt_app = self.bbox_jitter([curr_gt], im_w, im_h, noise_scale=0.05)[0]
-                curr_gt = curr_gt_motion
+                curr_gt = self.bbox_jitter([curr_gt], im_w, im_h, noise_scale=0.03, clip=False)[0]
             else:
-                curr_gt_app = []
+                curr_gt_app = self.bbox_clip_to_image([curr_gt], im_w, im_h)[0]
 
             if self.ecc:
                 prev_curr_identifier = ','.join([seq_name, str(start_frame + prev_frame_offset), seq_name, str(start_frame + curr_frame_offset)])
