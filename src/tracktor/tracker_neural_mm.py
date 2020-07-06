@@ -117,6 +117,15 @@ class TrackerNeuralMM(object):
             pos = torch.zeros(0).cuda()
         return pos
 
+    def get_unwarped_pos(self):
+        if len(self.tracks) == 1:
+            pos = self.tracks[0].unwarped_pos
+        elif len(self.tracks) > 1:
+            pos = torch.cat([t.unwarped_pos for t in self.tracks], 0)
+        else:
+            pos = torch.zeros(0).cuda()
+        return pos
+
     def get_features(self):
         """Get the features of all active tracks."""
         if len(self.tracks) == 1:
@@ -219,6 +228,8 @@ class TrackerNeuralMM(object):
             warp_matrix = torch.from_numpy(warp_matrix)
 
             for t in self.tracks:
+                # save unwarped pos for appearance features to be input into the motion model
+                t.unwarped_pos = t.pos
                 t.pos = warp_pos(t.pos, warp_matrix)
                 # t.pos = clip_boxes(Variable(pos), blob['im_info'][0][:2]).data
 
@@ -260,14 +271,20 @@ class TrackerNeuralMM(object):
         last_pos_2 = torch.cat(last_pos_2, 0)
 
         pos = self.get_pos()
+        if self.do_align:
+            # use the unwarped pos
+            pos_app = self.get_unwarped_pos()
+        else:
+            pos_app = pos
 
         if self.use_backbone_model:
-            img = [img.squeeze(0)]
-            target = [{"boxes": pos}]
+            img = [img]
+            target = [{"boxes": pos_app}]
 
             pred_motion = self.motion_model(img, target, last_pos_1, last_pos_2, output_motion=True)
         else:
-            conv_features, repr_features = self.get_pooled_features(pos)
+            # note that the current frame has not been loaded yet, so we are still using the last frame
+            conv_features, repr_features = self.get_pooled_features(pos_app)
 
             pred_motion = self.motion_model(conv_features, repr_features, last_pos_1, last_pos_2, output_motion=True)
             
@@ -293,11 +310,40 @@ class TrackerNeuralMM(object):
             # add current position to last_pos list
             t.last_pos.append(t.pos.clone())
 
+
+        ##################
+        # Predict tracks #
+        ##################
+
+        if len(self.tracks):
+            # align
+            if self.do_align:
+                self.align(blob)
+
+            # CHANGED apply neural motion model
+            if self.motion_model_cfg['enabled']:
+                self.motion(self.last_image)
+                self.tracks = [t for t in self.tracks if t.has_positive_area()]
+
+            # load the current frame
+            self.obj_detect.load_image(blob['img'])
+
+            # CHANGED check scores and terminate low score tracks. only regress positions for the first step.
+            self.check_track_scores(blob)
+
+            if len(self.tracks):
+                # CHANGED do not terminate tracks when they are occluded by each other
+
+                if self.do_reid:
+                    new_features = self.get_appearances(blob)
+                    self.add_features(new_features)
+        else:
+            self.obj_detect.load_image(blob['img'])
+
+
         ###########################
         # Look for new detections #
         ###########################
-
-        self.obj_detect.load_image(blob['img'])
 
         if self.public_detections:
             dets = blob['dets'].squeeze(dim=0)
@@ -324,30 +370,6 @@ class TrackerNeuralMM(object):
             det_pos = torch.zeros(0).cuda()
             det_scores = torch.zeros(0).cuda()
 
-        ##################
-        # Predict tracks #
-        ##################
-
-        num_tracks = 0
-        if len(self.tracks):
-            # align
-            if self.do_align:
-                self.align(blob)
-
-            # CHANGED apply neural motion model
-            if self.motion_model_cfg['enabled']:
-                self.motion(blob['img'])
-                self.tracks = [t for t in self.tracks if t.has_positive_area()]
-
-            # CHANGED check scores and terminate low score tracks. only regress positions for the first step.
-            self.check_track_scores(blob)
-
-            if len(self.tracks):
-                # CHANGED do not terminate tracks when they are occluded by each other
-
-                if self.do_reid:
-                    new_features = self.get_appearances(blob)
-                    self.add_features(new_features)
 
         #####################
         # Create new tracks #
@@ -427,7 +449,7 @@ class Track(object):
         self.last_v = torch.Tensor([])
         self.gt_id = None
 
-        self.init_motion = True
+        self.init_motion = False
 
     def has_positive_area(self):
         return self.pos[0, 2] > self.pos[0, 0] and self.pos[0, 3] > self.pos[0, 1]
