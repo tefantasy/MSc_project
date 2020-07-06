@@ -51,7 +51,7 @@ class MotionModel(nn.Module):
     def load_vis_pretrained(self, weight_path):
         self.vis_module.load_state_dict(torch.load(weight_path))
 
-    def forward(self, roi_pool_output, representation_feature, previous_loc, curr_loc):
+    def forward(self, roi_pool_output, representation_feature, previous_loc, curr_loc, output_motion=False):
         """
         Input and output bboxs (locations) are represented by (x1, y1, x2, y2) coordinates.
 
@@ -92,5 +92,8 @@ class MotionModel(nn.Module):
 
         # pred_loc = wh_to_two_p(pred_loc_wh)
 
-        return pred_loc_wh, vis.squeeze(-1)
+        if output_motion:
+            return pred_motion
+        else:
+            return pred_loc_wh, vis.squeeze(-1)
 
