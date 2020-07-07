@@ -219,7 +219,7 @@ def get_curr_reid_features(reid_model, img_list, curr_frame_offset, curr_gt_app)
 
 
 
-def train_main(use_ecc, use_modulator, use_bn, use_residual, use_reid_distance, vis_loss_ratio, no_vis_loss,
+def train_main(use_ecc, use_modulator, use_bn, use_residual, use_reid_distance, vis_loss_ratio, no_vis_loss, motion_noise,
                lr, weight_decay, batch_size, output_dir, ex_name):
     random.seed(12345)
     torch.manual_seed(12345)
@@ -246,9 +246,9 @@ def train_main(use_ecc, use_modulator, use_bn, use_residual, use_reid_distance, 
     #################
     # Load Datasets #
     #################
-    train_set = MOT17ClipsWrapper('train', 0.8, 0.0, clip_len=10, train_jitter=True, ecc=True, tracker_cfg=tracker_config)
+    train_set = MOT17ClipsWrapper('train', 0.8, 0.0, clip_len=10, motion_noise=motion_noise, train_jitter=True, ecc=True, tracker_cfg=tracker_config)
     train_loader = DataLoader(train_set, batch_size=1, shuffle=True, num_workers=1, collate_fn=clips_wrapper_collate)
-    val_set = MOT17ClipsWrapper('val', 0.8, 0.0, clip_len=10, train_jitter=True, ecc=True, tracker_cfg=tracker_config)
+    val_set = MOT17ClipsWrapper('val', 0.8, 0.0, clip_len=10, motion_noise=motion_noise, train_jitter=True, ecc=True, tracker_cfg=tracker_config)
     val_loader = DataLoader(val_set, batch_size=1, shuffle=False, num_workers=1, collate_fn=clips_wrapper_collate)
 
     with open(osp.join(cfg.ROOT_DIR, 'output', 'precomputed_ecc_matrices_3.pkl'), 'rb') as f:
@@ -425,10 +425,11 @@ if __name__ == '__main__':
     parser.add_argument('--use_reid_distance', action='store_true')
     parser.add_argument('--vis_loss_ratio', type=float, default=1.0)
     parser.add_argument('--no_vis_loss', action='store_true')
+    parser.add_argument('--motion_noise', type=float, default=0.03)
 
     args = parser.parse_args()
     print(args)
 
     train_main(args.use_ecc, args.use_modulator, args.use_bn, args.use_residual, args.use_reid_distance, 
-               args.vis_loss_ratio, args.no_vis_loss,
+               args.vis_loss_ratio, args.no_vis_loss, args.motion_noise, 
                args.lr, args.weight_decay, args.batch_size, args.output_dir, args.ex_name)

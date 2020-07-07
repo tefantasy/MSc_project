@@ -291,6 +291,7 @@ class TrackerNeuralMM(object):
             pos_app = clip_boxes_to_image(pos_app, img.shape[-2:])
             curr_reid_features = self.reid_network.test_rois(img.unsqueeze(0), pos_app)
 
+            # note that the current frame has not been loaded yet, so we are still using the last frame
             conv_features, repr_features = self.get_pooled_features(pos_app)
 
             pred_motion = self.motion_model(historical_reid_features, curr_reid_features, 
@@ -298,7 +299,6 @@ class TrackerNeuralMM(object):
 
         else:
             # MotionModel/MotionModelV2
-            # note that the current frame has not been loaded yet, so we are still using the last frame
             conv_features, repr_features = self.get_pooled_features(pos_app)
 
             pred_motion = self.motion_model(conv_features, repr_features, last_pos_1, last_pos_2, output_motion=True)

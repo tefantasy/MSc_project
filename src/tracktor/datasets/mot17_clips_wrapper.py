@@ -9,7 +9,8 @@ import cv2
 from .mot17_clips import MOT17Clips
 
 class MOT17ClipsWrapper(Dataset):
-    def __init__(self, split, train_ratio, vis_threshold, clip_len=10, min_track_len=2, train_jitter=True, ecc=True, tracker_cfg=None):
+    def __init__(self, split, train_ratio, vis_threshold, clip_len=10, min_track_len=2, motion_noise=0.03,
+                 train_jitter=True, ecc=True, tracker_cfg=None):
         assert min_track_len >= 2
         assert clip_len > min_track_len
 
@@ -18,6 +19,7 @@ class MOT17ClipsWrapper(Dataset):
 
         self.split = split
         self.is_train = (split == 'train')
+        self.motion_noise = motion_noise
         self.train_jitter = train_jitter
         self.ecc = ecc
 
@@ -141,7 +143,7 @@ class MOT17ClipsWrapper(Dataset):
 
             if self.is_train and self.train_jitter:
                 curr_gt_app = self.bbox_jitter([curr_gt], im_w, im_h, noise_scale=0.05)[0]
-                curr_gt = self.bbox_jitter([curr_gt], im_w, im_h, noise_scale=0.03, clip=False)[0]
+                curr_gt = self.bbox_jitter([curr_gt], im_w, im_h, noise_scale=self.motion_noise, clip=False)[0]
             else:
                 curr_gt_app = self.bbox_clip_to_image([curr_gt], im_w, im_h)[0]
 
