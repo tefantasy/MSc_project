@@ -219,7 +219,7 @@ def get_curr_reid_features(reid_model, img_list, curr_frame_offset, curr_gt_app)
 
 
 
-def train_main(use_ecc, use_modulator, use_bn, use_residual, use_reid_distance, vis_loss_ratio, no_vis_loss, motion_noise,
+def train_main(use_ecc, use_modulator, use_bn, use_residual, use_reid_distance, no_visrepr, vis_loss_ratio, no_vis_loss, motion_noise,
                lr, weight_decay, batch_size, output_dir, ex_name):
     random.seed(12345)
     torch.manual_seed(12345)
@@ -236,8 +236,8 @@ def train_main(use_ecc, use_modulator, use_bn, use_residual, use_reid_distance, 
     with open(log_file, 'w') as f:
         f.write('[Experiment name]%s\n\n' % ex_name)
         f.write('[Parameters]\n')
-        f.write('use_ecc=%r\nuse_modulator=%r\nuse_bn=%r\nuse_residual=%r\nuse_reid_distance=%r\nvis_loss_ratio=%f\nno_vis_loss=%r\nlr=%f\nweight_decay=%f\nbatch_size=%d\n\n' % 
-            (use_ecc, use_modulator, use_bn, use_residual, use_reid_distance, vis_loss_ratio, no_vis_loss, lr, weight_decay, batch_size))
+        f.write('use_ecc=%r\nuse_modulator=%r\nuse_bn=%r\nuse_residual=%r\nuse_reid_distance=%r\nno_visrepr=%r\nvis_loss_ratio=%f\nno_vis_loss=%r\nmotion_noise=%f\nlr=%f\nweight_decay=%f\nbatch_size=%d\n\n' % 
+            (use_ecc, use_modulator, use_bn, use_residual, use_reid_distance, no_visrepr, vis_loss_ratio, no_vis_loss, motion_noise, lr, weight_decay, batch_size))
         f.write('[Loss log]\n')
 
     with open('experiments/cfgs/tracktor.yaml', 'r') as f:
@@ -266,7 +266,8 @@ def train_main(use_ecc, use_modulator, use_bn, use_residual, use_reid_distance, 
     obj_detect.eval()
     obj_detect.cuda()
 
-    motion_model = MotionModelReID(use_modulator=use_modulator, use_bn=use_bn, use_residual=use_residual, use_reid_distance=use_reid_distance)
+    motion_model = MotionModelReID(use_modulator=use_modulator, use_bn=use_bn, use_residual=use_residual, 
+                                   use_reid_distance=use_reid_distance, no_visrepr=no_visrepr)
 
     motion_model.train()
     motion_model.cuda()
@@ -423,6 +424,7 @@ if __name__ == '__main__':
     parser.add_argument('--use_bn', action='store_true')
     parser.add_argument('--use_residual', action='store_true')
     parser.add_argument('--use_reid_distance', action='store_true')
+    parser.add_argument('--no_visrepr', action='store_true')
     parser.add_argument('--vis_loss_ratio', type=float, default=1.0)
     parser.add_argument('--no_vis_loss', action='store_true')
     parser.add_argument('--motion_noise', type=float, default=0.03)
@@ -430,6 +432,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print(args)
 
-    train_main(args.use_ecc, args.use_modulator, args.use_bn, args.use_residual, args.use_reid_distance, 
+    train_main(args.use_ecc, args.use_modulator, args.use_bn, args.use_residual, args.use_reid_distance, args.no_visrepr, 
                args.vis_loss_ratio, args.no_vis_loss, args.motion_noise, 
                args.lr, args.weight_decay, args.batch_size, args.output_dir, args.ex_name)

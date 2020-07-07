@@ -6,7 +6,7 @@ from .utils import encode_motion, decode_motion, two_p_to_wh, wh_to_two_p
 
 class MotionModelReID(nn.Module):
     def __init__(self, reid_dim=128, roi_output_dim=256, pool_size=7, representation_dim=1024, motion_repr_dim=512, 
-                 use_modulator=True, use_bn=False, use_residual=True, use_reid_distance=True):
+                 use_modulator=True, use_bn=False, use_residual=True, use_reid_distance=True, no_visrepr=False):
         super(MotionModelReID, self).__init__()
 
         self.reid_dim = reid_dim
@@ -19,6 +19,7 @@ class MotionModelReID(nn.Module):
         self.use_bn = use_bn
         self.use_residual = use_residual
         self.use_reid_distance = use_reid_distance
+        self.no_visrepr = no_visrepr
 
         self.activation = nn.ReLU()
 
@@ -88,15 +89,26 @@ class MotionModelReID(nn.Module):
                 nn.BatchNorm1d(motion_repr_dim), self.activation
             )
             # motion residual regression #
-            self.motion_regress = nn.Sequential(
-                nn.Linear(representation_dim + motion_repr_dim + self.vis_repr_dim, representation_dim + motion_repr_dim + self.vis_repr_dim),
-                nn.BatchNorm1d(representation_dim + motion_repr_dim + self.vis_repr_dim),
-                self.activation,
-                nn.Linear(representation_dim + motion_repr_dim + self.vis_repr_dim, motion_repr_dim),
-                nn.BatchNorm1d(motion_repr_dim),
-                self.activation,
-                nn.Linear(motion_repr_dim, 4)
-            )
+            if no_visrepr:
+                self.motion_regress = nn.Sequential(
+                    nn.Linear(representation_dim + motion_repr_dim, representation_dim + motion_repr_dim),
+                    nn.BatchNorm1d(representation_dim + motion_repr_dim),
+                    self.activation,
+                    nn.Linear(representation_dim + motion_repr_dim, motion_repr_dim),
+                    nn.BatchNorm1d(motion_repr_dim),
+                    self.activation,
+                    nn.Linear(motion_repr_dim, 4)
+                )
+            else:
+                self.motion_regress = nn.Sequential(
+                    nn.Linear(representation_dim + motion_repr_dim + self.vis_repr_dim, representation_dim + motion_repr_dim + self.vis_repr_dim),
+                    nn.BatchNorm1d(representation_dim + motion_repr_dim + self.vis_repr_dim),
+                    self.activation,
+                    nn.Linear(representation_dim + motion_repr_dim + self.vis_repr_dim, motion_repr_dim),
+                    nn.BatchNorm1d(motion_repr_dim),
+                    self.activation,
+                    nn.Linear(motion_repr_dim, 4)
+                )
         else:
             # appearance branch #
             self.appearance_conv = nn.Sequential(
@@ -154,13 +166,22 @@ class MotionModelReID(nn.Module):
                 self.activation
             )
             # motion residual regression #
-            self.motion_regress = nn.Sequential(
-                nn.Linear(representation_dim + motion_repr_dim + self.vis_repr_dim, representation_dim + motion_repr_dim + self.vis_repr_dim),
-                self.activation,
-                nn.Linear(representation_dim + motion_repr_dim + self.vis_repr_dim, motion_repr_dim),
-                self.activation,
-                nn.Linear(motion_repr_dim, 4)
-            )
+            if no_visrepr:
+                self.motion_regress = nn.Sequential(
+                    nn.Linear(representation_dim + motion_repr_dim, representation_dim + motion_repr_dim),
+                    self.activation,
+                    nn.Linear(representation_dim + motion_repr_dim, motion_repr_dim),
+                    self.activation,
+                    nn.Linear(motion_repr_dim, 4)
+                )
+            else:
+                self.motion_regress = nn.Sequential(
+                    nn.Linear(representation_dim + motion_repr_dim + self.vis_repr_dim, representation_dim + motion_repr_dim + self.vis_repr_dim),
+                    self.activation,
+                    nn.Linear(representation_dim + motion_repr_dim + self.vis_repr_dim, motion_repr_dim),
+                    self.activation,
+                    nn.Linear(motion_repr_dim, 4)
+                )
 
     def forward(self, historical_reid, curr_reid, roi_pool_output, representation_feature, previous_loc, curr_loc, output_motion=False):
         """
@@ -216,9 +237,14 @@ class MotionModelReID(nn.Module):
         motion_repr_feature = self.motion_repr(input_motion)
 
         # motion residual prediction #
-        motion_residual = self.motion_regress(
-            torch.cat([appearance_feature, motion_repr_feature, vis_feature], 1)
-        )
+        if self.no_visrepr:
+            motion_residual = self.motion_regress(
+                torch.cat([appearance_feature, motion_repr_feature], 1)
+            )
+        else:
+            motion_residual = self.motion_regress(
+                torch.cat([appearance_feature, motion_repr_feature, vis_feature], 1)
+            )
 
         # output #
         if self.use_residual:
