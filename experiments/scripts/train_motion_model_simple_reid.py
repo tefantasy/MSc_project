@@ -158,7 +158,7 @@ def train_main(use_ecc, use_modulator, use_bn, use_residual, vis_roi_features, n
 
             prev_loc = (data['prev_gt_warped'] if use_ecc else data['prev_gt']).cuda()
             curr_loc = (data['curr_gt_warped'] if use_ecc else data['curr_gt']).cuda()
-            label_loc = label['label_gt'].cuda()
+            label_loc = data['label_gt'].cuda()
             curr_vis = data['curr_vis'].cuda()
 
             n_iter += 1
@@ -200,7 +200,7 @@ def train_main(use_ecc, use_modulator, use_bn, use_residual, vis_roi_features, n
 
                 prev_loc = (data['prev_gt_warped'] if use_ecc else data['prev_gt']).cuda()
                 curr_loc = (data['curr_gt_warped'] if use_ecc else data['curr_gt']).cuda()
-                label_loc = label['label_gt'].cuda()
+                label_loc = data['label_gt'].cuda()
                 curr_vis = data['curr_vis'].cuda()
 
                 pred_loc_wh, vis = motion_model(early_reid, curr_reid, conv_features, repr_features, prev_loc, curr_loc)
