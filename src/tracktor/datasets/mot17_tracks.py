@@ -13,12 +13,13 @@ class MOT17Tracks(MOT17Sequence):
       of the dataset are the continuous tracks.
     """
 
-    def __init__(self, seq_name, vis_threshold, track_len, keep_short_track=False):
+    def __init__(self, seq_name, vis_threshold, track_len, keep_short_track=False, simple_reid=False):
         super().__init__(seq_name, vis_threshold=vis_threshold)
 
         self._num_frames = len(self.data)
         self._track_len = track_len
         self._keep_short_track = keep_short_track
+        self._simple_reid = simple_reid
 
         track_data = self.build_tracks()
         self._track_data = self.build_samples(track_data)
@@ -71,17 +72,25 @@ class MOT17Tracks(MOT17Sequence):
 
         for track in track_data:
             if track['last_frame'] - track['start_frame'] + 1 <= self._track_len:
-                segmented_tracks.append(track)
+                if self._keep_short_track:
+                    segmented_tracks.append(track)
             else:
                 offset = 0
                 while track['start_frame'] + offset + self._track_len - 1 <= track['last_frame']:
-                    segmented_tracks.append({
+                    track_clip = {
                         'gt' : track['gt'][offset:offset+self._track_len],
                         'im_path' : track['im_path'][offset:offset+self._track_len],
                         'vis' : track['vis'][offset:offset+self._track_len],
                         'start_frame' : track['start_frame'] + offset,
                         'last_frame' : track['start_frame'] + offset + self._track_len - 1
-                    })
+                    }
+                    if self._simple_reid:
+                        early_len = min(3, offset + 1)
+                        track_clip['early_start_frame'] = track['start_frame']
+                        track_clip['early_im_path'] = track['im_path'][:early_len]
+                        track_clip['early_gt'] = track['gt'][:early_len]
+
+                    segmented_tracks.append(track_clip)
                     offset += 1
 
         return segmented_tracks
