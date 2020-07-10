@@ -18,6 +18,7 @@ from tracktor.datasets.mot17_simple_reid_wrapper import MOT17SimpleReIDWrapper, 
 
 from tracktor.frcnn_fpn import FRCNN_FPN
 from tracktor.motion.model_simple_reid import MotionModelSimpleReID
+from tracktor.motion.model_simple_reid_v2 import MotionModelSimpleReIDV2
 from tracktor.reid.resnet import resnet50
 
 from tracktor.motion.utils import two_p_to_wh
@@ -61,7 +62,7 @@ def get_batch_mean_early_reid(reid_model, early_reid_patches):
     return batch_reid_features
 
 
-def train_main(use_ecc, use_modulator, use_bn, use_residual, vis_roi_features, no_visrepr, vis_loss_ratio, no_vis_loss,
+def train_main(v2, use_ecc, use_modulator, use_bn, use_residual, vis_roi_features, no_visrepr, vis_loss_ratio, no_vis_loss,
                max_sample_frame, lr, weight_decay, batch_size, output_dir, ex_name):
     random.seed(12345)
     torch.manual_seed(12345)
@@ -108,8 +109,12 @@ def train_main(use_ecc, use_modulator, use_bn, use_residual, vis_roi_features, n
     obj_detect.eval()
     obj_detect.cuda()
 
-    motion_model = MotionModelSimpleReID(use_modulator=use_modulator, use_bn=use_bn, use_residual=use_residual, 
-                                         vis_roi_features=vis_roi_features, no_visrepr=no_visrepr)
+    if v2:
+        motion_model = MotionModelSimpleReIDV2(use_modulator=use_modulator, use_bn=use_bn, use_residual=use_residual, 
+                                               vis_roi_features=vis_roi_features, no_visrepr=no_visrepr)
+    else:
+        motion_model = MotionModelSimpleReID(use_modulator=use_modulator, use_bn=use_bn, use_residual=use_residual, 
+                                             vis_roi_features=vis_roi_features, no_visrepr=no_visrepr)
     motion_model.train()
     motion_model.cuda()
 
@@ -163,7 +168,10 @@ def train_main(use_ecc, use_modulator, use_bn, use_residual, vis_roi_features, n
 
             n_iter += 1
             optimizer.zero_grad()
-            pred_loc_wh, vis = motion_model(early_reid, curr_reid, conv_features, repr_features, prev_loc, curr_loc)
+            if v2:
+                pred_loc_wh, vis = motion_model(early_reid, curr_reid, repr_features, prev_loc, curr_loc)
+            else:
+                pred_loc_wh, vis = motion_model(early_reid, curr_reid, conv_features, repr_features, prev_loc, curr_loc)
             label_loc_wh = two_p_to_wh(label_loc)
 
             pred_loss = pred_loss_func(pred_loc_wh, label_loc_wh)
@@ -203,7 +211,10 @@ def train_main(use_ecc, use_modulator, use_bn, use_residual, vis_roi_features, n
                 label_loc = data['label_gt'].cuda()
                 curr_vis = data['curr_vis'].cuda()
 
-                pred_loc_wh, vis = motion_model(early_reid, curr_reid, conv_features, repr_features, prev_loc, curr_loc)
+                if v2:
+                    pred_loc_wh, vis = motion_model(early_reid, curr_reid, repr_features, prev_loc, curr_loc)
+                else:
+                    pred_loc_wh, vis = motion_model(early_reid, curr_reid, conv_features, repr_features, prev_loc, curr_loc)
                 label_loc_wh = two_p_to_wh(label_loc)
 
                 pred_loss = pred_loss_func(pred_loc_wh, label_loc_wh)
@@ -257,10 +268,11 @@ if __name__ == '__main__':
     parser.add_argument('--no_vis_loss', action='store_true')
 
     parser.add_argument('--max_sample_frame', type=int, default=2)
+    parser.add_argument('--v2', action='store_true')
 
     args = parser.parse_args()
     print(args)
 
-    train_main(args.use_ecc, args.use_modulator, args.use_bn, args.use_residual, args.vis_roi_features, 
+    train_main(args.v2, args.use_ecc, args.use_modulator, args.use_bn, args.use_residual, args.vis_roi_features, 
                args.no_visrepr, args.vis_loss_ratio, args.no_vis_loss, args.max_sample_frame,
                args.lr, args.weight_decay, args.batch_size, args.output_dir, args.ex_name)
