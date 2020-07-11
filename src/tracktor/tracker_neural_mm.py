@@ -281,7 +281,7 @@ class TrackerNeuralMM(object):
             pos_app = pos
 
         if self.use_backbone_model:
-            img = [img]
+            img = [img.cuda()]
             target = [{"boxes": pos_app}]
 
             pred_motion = self.motion_model(img, target, last_pos_1, last_pos_2, output_motion=True)
