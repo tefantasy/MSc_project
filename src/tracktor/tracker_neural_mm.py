@@ -9,6 +9,8 @@ import cv2
 
 from tracktor.motion.backbone_model import BackboneMotionModel
 from tracktor.motion.model_reid import MotionModelReID
+from tracktor.motion.model_simple_reid import MotionModelSimpleReID
+from tracktor.motion.model_simple_reid_v2 import MotionModelSimpleReIDV2
 from tracktor.motion.utils import encode_motion, decode_motion, two_p_to_wh, wh_to_two_p
 from .utils import bbox_overlaps, warp_pos, get_center, get_height, get_width, make_pos
 
@@ -26,6 +28,8 @@ class TrackerNeuralMM(object):
         self.motion_model = motion_model
         self.use_backbone_model = isinstance(motion_model, BackboneMotionModel)
         self.use_reid_motion_model = isinstance(motion_model, MotionModelReID)
+        self.use_simple_reid_model = isinstance(motion_model, MotionModelSimpleReID)
+        self.use_simple_reid_v2_model = isinstance(motion_model, MotionModelSimpleReIDV2)
 
         self.detection_person_thresh = tracker_cfg['detection_person_thresh']
         self.regression_person_thresh = tracker_cfg['regression_person_thresh']
@@ -266,7 +270,7 @@ class TrackerNeuralMM(object):
         """
         Apply neural motion model to all active tracks. Apply last_v to all inactive tracks. 
         Input:
-            -img: mandatory if using BackboneMotionModel or MotionModelReID
+            -img: LAST frame. Mandatory if not using MotionModel/MotionModelV2.
         """
         last_pos_1 = [t.last_pos[-2] for t in self.tracks]
         last_pos_2 = [t.last_pos[-1] for t in self.tracks]
@@ -296,6 +300,20 @@ class TrackerNeuralMM(object):
 
             pred_motion = self.motion_model(historical_reid_features, curr_reid_features, 
                                             conv_features, repr_features, last_pos_1, last_pos_2, output_motion=True)
+        elif self.use_simple_reid_model or self.use_simple_reid_v2_model:
+            early_reid_features = torch.stack([torch.mean(torch.cat(t.early_features, 0), 0) for t in self.tracks], 0)
+
+            pos_app = clip_boxes_to_image(pos_app, img.shape[-2:])
+            curr_reid_features = self.reid_network.test_rois(img.unsqueeze(0), pos_app)
+
+            conv_features, repr_features = self.get_pooled_features(pos_app)
+
+            if self.use_simple_reid_model:
+                pred_motion = self.motion_model(early_reid_features, curr_reid_features, conv_features, repr_features,
+                                                last_pos_1, last_pos_2, output_motion=True)
+            else:
+                pred_motion = self.motion_model(early_reid_features, curr_reid_features, repr_features,
+                                                last_pos_1, last_pos_2, output_motion=True)
 
         else:
             # MotionModel/MotionModelV2
@@ -466,6 +484,9 @@ class Track(object):
 
         self.init_motion = False
 
+        self.max_early_features_num = 3
+        self.early_features = []
+
     def has_positive_area(self):
         return self.pos[0, 2] > self.pos[0, 0] and self.pos[0, 3] > self.pos[0, 1]
 
@@ -474,6 +495,8 @@ class Track(object):
         self.features.append(features)
         if len(self.features) > self.max_features_num:
             self.features.popleft()
+        if len(self.early_features) < self.max_early_features_num:
+            self.early_features.append(features)
 
     def test_features(self, test_features):
         """Compares test_features to features of this Track object"""

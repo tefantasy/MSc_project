@@ -22,6 +22,8 @@ from tracktor.tracker import Tracker
 from tracktor.tracker_neural_mm import TrackerNeuralMM
 from tracktor.motion.model import MotionModel
 from tracktor.motion.model_v2 import MotionModelV2
+from tracktor.motion.backbone_model import BackboneMotionModel
+from tracktor.motion.model_reid import MotionModelReID
 from tracktor.reid.resnet import resnet50
 from tracktor.utils import interpolate, plot_sequence, get_mot_accum, evaluate_mot_accums
 
