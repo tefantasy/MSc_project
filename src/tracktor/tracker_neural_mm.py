@@ -488,7 +488,7 @@ class Track(object):
         self.init_motion = False
 
         self.max_early_features_num = 3
-        self.early_features = []
+        self.early_features = [features]
 
     def has_positive_area(self):
         return self.pos[0, 2] > self.pos[0, 0] and self.pos[0, 3] > self.pos[0, 1]
