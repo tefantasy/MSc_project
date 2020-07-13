@@ -59,11 +59,6 @@ class MotionModelV2(nn.Module):
                         nn.Linear(self.vis_repr_dim, 4),
                         nn.Sigmoid()
                     )
-                else:
-                    self.vis_modulate = nn.Sequential(
-                        nn.Linear(self.vis_repr_dim, 1),
-                        nn.Sigmoid()
-                    )
             # motion branch #
             self.motion_repr = nn.Sequential(
                 nn.Linear(4, motion_repr_dim),
@@ -113,11 +108,6 @@ class MotionModelV2(nn.Module):
                         nn.Linear(self.vis_repr_dim, 4),
                         nn.Sigmoid()
                     )
-                else:
-                    self.vis_modulate = nn.Sequential(
-                        nn.Linear(self.vis_repr_dim, 1),
-                        nn.Sigmoid()
-                    )
             # motion branch #
             self.motion_repr = nn.Sequential(
                 nn.Linear(4, motion_repr_dim),
@@ -154,8 +144,10 @@ class MotionModelV2(nn.Module):
 
         vis_out = torch.sigmoid(self.vis_out(vis_feature))
 
-        if self.use_residual:
+        if self.use_modulator:
             modulator = self.vis_modulate(vis_feature)
+        else:
+            modulator = vis_out
 
 
         # motion #
