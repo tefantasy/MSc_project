@@ -11,6 +11,7 @@ from .model_simple_reid import MotionModelSimpleReID
 from .model_simple_reid_v2 import MotionModelSimpleReIDV2
 
 from torchvision.ops.boxes import clip_boxes_to_image
+from torchvision.models.detection.transform import resize_boxes
 
 class RefineModel(nn.Module):
     def __init__(self, motion_model, roi_output_dim=256, pool_size=7, representation_dim=1024):
