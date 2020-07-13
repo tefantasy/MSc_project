@@ -253,7 +253,7 @@ def train_main(v2, use_refine_model, use_ecc, use_modulator, use_bn, use_residua
                 curr_vis = data['curr_vis'].cuda()
 
                 if use_refine_model:
-                    pred_loc_wh, vis = refine_model(obj_detect, data['label_img'], conv_features, repr_features, prev_loc, curr_loc,
+                    pred_loc_wh, vis = motion_model(obj_detect, data['label_img'], conv_features, repr_features, prev_loc, curr_loc,
                                                     early_reid=early_reid, curr_reid=curr_reid)
                     label_loc_wh = two_p_to_wh(label_loc)
 
