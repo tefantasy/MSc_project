@@ -43,7 +43,7 @@ class RefineModel(nn.Module):
         self.regress_head = nn.Linear(representation_dim, 4)
 
 
-    def get_roi_features(obj_detect, img_list, gts):
+    def get_roi_features(self, obj_detect, img_list, gts):
         """
         Input:
             -img_list: list of (1, 3, w, h). Can be different sizes. 
