@@ -257,7 +257,7 @@ def train_main(v2, use_refine_model, use_ecc, use_modulator, use_bn, use_residua
                                                     early_reid=early_reid, curr_reid=curr_reid)
                     label_loc_wh = two_p_to_wh(label_loc)
 
-                    pred_loss = weighted_smooth_l1_loss(pred_loc_wh, label_loc_wh, curr_vis)
+                    pred_loss = pred_loss_func(pred_loc_wh, label_loc_wh)
                     vis_loss = vis_loss_func(vis, curr_vis)
                 else:
                     if v2:
