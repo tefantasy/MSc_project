@@ -128,7 +128,8 @@ class MotionModelSimpleReIDV2(nn.Module):
                     nn.Linear(motion_repr_dim, 4)
                 )
 
-    def forward(self, early_reid, curr_reid, representation_feature, previous_loc, curr_loc, output_motion=False):
+    def forward(self, early_reid, curr_reid, representation_feature, previous_loc, curr_loc, 
+                output_motion=False, output_vis_feature=False):
 
         previous_loc_wh = two_p_to_wh(previous_loc)
         curr_loc_wh = two_p_to_wh(curr_loc)
@@ -171,4 +172,7 @@ class MotionModelSimpleReIDV2(nn.Module):
         if output_motion:
             return pred_motion
         else:
-            return pred_loc_wh, vis_output.squeeze(-1)
+            if output_vis_feature:
+                return pred_loc_wh, vis_output.squeeze(-1), vis_feature
+            else:
+                return pred_loc_wh, vis_output.squeeze(-1)

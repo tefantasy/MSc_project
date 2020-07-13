@@ -266,11 +266,11 @@ class TrackerNeuralMM(object):
 
         return box_features, box_head_features
 
-    def motion(self, img=None):
+    def motion(self, img):
         """
         Apply neural motion model to all active tracks. Apply last_v to all inactive tracks. 
         Input:
-            -img: LAST frame. Mandatory if not using MotionModel/MotionModelV2.
+            -img: LAST frame
         """
         last_pos_1 = [t.last_pos[-2] for t in self.tracks]
         last_pos_2 = [t.last_pos[-1] for t in self.tracks]
@@ -286,6 +286,8 @@ class TrackerNeuralMM(object):
 
         if self.use_backbone_model:
             img = [img.cuda()]
+            pos_app = clip_boxes_to_image(pos_app, img.shape[-2:])
+
             target = [{"boxes": pos_app}]
 
             pred_motion = self.motion_model(img, target, last_pos_1, last_pos_2, output_motion=True)
@@ -317,6 +319,7 @@ class TrackerNeuralMM(object):
 
         else:
             # MotionModel/MotionModelV2
+            pos_app = clip_boxes_to_image(pos_app, img.shape[-2:])
             conv_features, repr_features = self.get_pooled_features(pos_app)
 
             pred_motion = self.motion_model(conv_features, repr_features, last_pos_1, last_pos_2, output_motion=True)

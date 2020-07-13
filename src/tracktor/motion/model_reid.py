@@ -183,7 +183,8 @@ class MotionModelReID(nn.Module):
                     nn.Linear(motion_repr_dim, 4)
                 )
 
-    def forward(self, historical_reid, curr_reid, roi_pool_output, representation_feature, previous_loc, curr_loc, output_motion=False):
+    def forward(self, historical_reid, curr_reid, roi_pool_output, representation_feature, previous_loc, curr_loc, 
+                output_motion=False, output_vis_feature=False):
         """
         Input and output bboxs (locations) are represented by (x1, y1, x2, y2) coordinates.
 
@@ -257,4 +258,7 @@ class MotionModelReID(nn.Module):
         if output_motion:
             return pred_motion
         else:
-            return pred_loc_wh, vis_output.squeeze(-1)
+            if output_vis_feature:
+                return pred_loc_wh, vis_output.squeeze(-1), vis_feature
+            else:
+                return pred_loc_wh, vis_output.squeeze(-1)

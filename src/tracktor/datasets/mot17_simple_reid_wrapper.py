@@ -231,7 +231,7 @@ class MOT17SimpleReIDWrapper(Dataset):
             'prev_gt': prev_gt, 'prev_gt_warped': prev_gt_warped, 
             'curr_gt': curr_gt, 'curr_gt_warped': curr_gt_warped, 'curr_gt_app': curr_gt_app, 
             'curr_img': curr_img.unsqueeze(0), 'curr_vis': curr_vis, 'curr_reid_patch': curr_reid_patch, 
-            'label_gt': label_gt
+            'label_gt': label_gt, 'label_img': label_img.unsqueeze(0)
         }
         return output_data
 

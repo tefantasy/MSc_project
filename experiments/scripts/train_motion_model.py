@@ -12,6 +12,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torchvision.models.detection.transform import resize_boxes
+from torchvision.ops.boxes import clip_boxes_to_image
 
 from tracktor.config import get_output_dir
 from tracktor.datasets.mot17_tracks_wrapper import MOT17TracksWrapper, tracks_wrapper_collate
@@ -44,6 +45,7 @@ def get_features(obj_detect, img_list, gts):
             obj_detect.load_image(img)
 
             gt = gts[i].unsqueeze(0)
+            gt = clip_boxes_to_image(gt, img.shape[-2:])
             gt = resize_boxes(gt, obj_detect.original_image_sizes[0], obj_detect.preprocessed_images.image_sizes[0])
             gt = [gt]
 

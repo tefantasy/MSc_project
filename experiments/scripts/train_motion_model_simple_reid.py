@@ -12,6 +12,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torchvision.models.detection.transform import resize_boxes
 from torchvision.transforms import Resize, Compose, ToPILImage, ToTensor
+from torchvision.ops.boxes import clip_boxes_to_image
 
 from tracktor.config import cfg, get_output_dir
 from tracktor.datasets.mot17_simple_reid_wrapper import MOT17SimpleReIDWrapper, simple_reid_wrapper_collate
@@ -19,6 +20,7 @@ from tracktor.datasets.mot17_simple_reid_wrapper import MOT17SimpleReIDWrapper, 
 from tracktor.frcnn_fpn import FRCNN_FPN
 from tracktor.motion.model_simple_reid import MotionModelSimpleReID
 from tracktor.motion.model_simple_reid_v2 import MotionModelSimpleReIDV2
+from tracktor.motion.refine_model import RefineModel
 from tracktor.reid.resnet import resnet50
 
 from tracktor.motion.utils import two_p_to_wh
@@ -42,6 +44,7 @@ def get_features(obj_detect, img_list, gts):
             obj_detect.load_image(img)
 
             gt = gts[i].unsqueeze(0)
+            gt = clip_boxes_to_image(gt, img.shape[-2:])
             gt = resize_boxes(gt, obj_detect.original_image_sizes[0], obj_detect.preprocessed_images.image_sizes[0])
             gt = [gt]
 
@@ -62,7 +65,32 @@ def get_batch_mean_early_reid(reid_model, early_reid_patches):
     return batch_reid_features
 
 
-def train_main(v2, use_ecc, use_modulator, use_bn, use_residual, vis_roi_features, no_visrepr, vis_loss_ratio, no_vis_loss,
+
+def weighted_smooth_l1_loss(pred, target, vis):
+    """
+    pred: (batch, 4)
+    target: (batch, 4)
+    vis: (batch, ) used to calculate weights
+    """
+    gamma = 4
+    batch_size = pred.size()[0]
+
+    loss_abs = torch.abs(pred - target)
+    loss_quadratic = 0.5 * (loss_abs ** 2)
+
+    loss = torch.where(loss_abs >= 1.0, loss_abs - 0.5, loss_quadratic)
+
+    weights = torch.pow(gamma, 1.0 - vis).unsqueeze(-1).expand(-1, 4)
+    loss = weights * loss
+
+    # 2 for compensating the increase because of weights
+    loss = torch.sum(loss) / (batch_size * 4 * 2)
+
+    return loss
+
+
+
+def train_main(v2, use_refine_model, use_ecc, use_modulator, use_bn, use_residual, vis_roi_features, no_visrepr, vis_loss_ratio, no_vis_loss,
                max_sample_frame, lr, weight_decay, batch_size, output_dir, ex_name):
     random.seed(12345)
     torch.manual_seed(12345)
@@ -118,12 +146,16 @@ def train_main(v2, use_ecc, use_modulator, use_bn, use_residual, vis_roi_feature
     motion_model.train()
     motion_model.cuda()
 
+    if use_refine_model:
+        motion_model = RefineModel(motion_model)
+        motion_model.train()
+        motion_model.cuda()
+
     reid_network = resnet50(pretrained=False, output_dim=128)
     reid_network.load_state_dict(torch.load(tracker_config['tracktor']['reid_weights'],
                                  map_location=lambda storage, loc: storage))
     reid_network.eval()
     reid_network.cuda()
-
 
     optimizer = torch.optim.Adam(motion_model.parameters(), lr=lr, weight_decay=weight_decay)
     pred_loss_func = nn.SmoothL1Loss()
@@ -168,14 +200,23 @@ def train_main(v2, use_ecc, use_modulator, use_bn, use_residual, vis_roi_feature
 
             n_iter += 1
             optimizer.zero_grad()
-            if v2:
-                pred_loc_wh, vis = motion_model(early_reid, curr_reid, repr_features, prev_loc, curr_loc)
-            else:
-                pred_loc_wh, vis = motion_model(early_reid, curr_reid, conv_features, repr_features, prev_loc, curr_loc)
-            label_loc_wh = two_p_to_wh(label_loc)
+            if use_refine_model:
+                pred_loc_wh, vis = motion_model(obj_detect, data['label_img'], conv_features, repr_features, prev_loc, curr_loc,
+                                                early_reid=early_reid, curr_reid=curr_reid)
+                label_loc_wh = two_p_to_wh(label_loc)
 
-            pred_loss = pred_loss_func(pred_loc_wh, label_loc_wh)
-            vis_loss = vis_loss_func(vis, curr_vis)
+                pred_loss = weighted_smooth_l1_loss(pred_loc_wh, label_loc_wh, curr_vis)
+                vis_loss = vis_loss_func(vis, curr_vis)
+            else:
+                if v2:
+                    pred_loc_wh, vis = motion_model(early_reid, curr_reid, repr_features, prev_loc, curr_loc)
+                else:
+                    pred_loc_wh, vis = motion_model(early_reid, curr_reid, conv_features, repr_features, prev_loc, curr_loc)
+                label_loc_wh = two_p_to_wh(label_loc)
+
+                pred_loss = pred_loss_func(pred_loc_wh, label_loc_wh)
+                vis_loss = vis_loss_func(vis, curr_vis)
+            
             if no_vis_loss:
                 loss = pred_loss
             else:
@@ -211,14 +252,22 @@ def train_main(v2, use_ecc, use_modulator, use_bn, use_residual, vis_roi_feature
                 label_loc = data['label_gt'].cuda()
                 curr_vis = data['curr_vis'].cuda()
 
-                if v2:
-                    pred_loc_wh, vis = motion_model(early_reid, curr_reid, repr_features, prev_loc, curr_loc)
-                else:
-                    pred_loc_wh, vis = motion_model(early_reid, curr_reid, conv_features, repr_features, prev_loc, curr_loc)
-                label_loc_wh = two_p_to_wh(label_loc)
+                if use_refine_model:
+                    pred_loc_wh, vis = refine_model(obj_detect, data['label_img'], conv_features, repr_features, prev_loc, curr_loc,
+                                                    early_reid=early_reid, curr_reid=curr_reid)
+                    label_loc_wh = two_p_to_wh(label_loc)
 
-                pred_loss = pred_loss_func(pred_loc_wh, label_loc_wh)
-                vis_loss = vis_loss_func(vis, curr_vis)
+                    pred_loss = weighted_smooth_l1_loss(pred_loc_wh, label_loc_wh, curr_vis)
+                    vis_loss = vis_loss_func(vis, curr_vis)
+                else:
+                    if v2:
+                        pred_loc_wh, vis = motion_model(early_reid, curr_reid, repr_features, prev_loc, curr_loc)
+                    else:
+                        pred_loc_wh, vis = motion_model(early_reid, curr_reid, conv_features, repr_features, prev_loc, curr_loc)
+                    label_loc_wh = two_p_to_wh(label_loc)
+
+                    pred_loss = pred_loss_func(pred_loc_wh, label_loc_wh)
+                    vis_loss = vis_loss_func(vis, curr_vis)
 
                 val_pred_loss_iters.append(pred_loss.item())
                 val_vis_loss_iters.append(vis_loss.item())
@@ -269,10 +318,11 @@ if __name__ == '__main__':
 
     parser.add_argument('--max_sample_frame', type=int, default=2)
     parser.add_argument('--v2', action='store_true')
+    parser.add_argument('--refine_model', action='store_true')
 
     args = parser.parse_args()
     print(args)
 
-    train_main(args.v2, args.use_ecc, args.use_modulator, args.use_bn, args.use_residual, args.vis_roi_features, 
+    train_main(args.v2, args.refine_model, args.use_ecc, args.use_modulator, args.use_bn, args.use_residual, args.vis_roi_features, 
                args.no_visrepr, args.vis_loss_ratio, args.no_vis_loss, args.max_sample_frame,
                args.lr, args.weight_decay, args.batch_size, args.output_dir, args.ex_name)
