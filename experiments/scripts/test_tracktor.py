@@ -24,6 +24,8 @@ from tracktor.motion.model import MotionModel
 from tracktor.motion.model_v2 import MotionModelV2
 from tracktor.motion.backbone_model import BackboneMotionModel
 from tracktor.motion.model_reid import MotionModelReID
+from .model_simple_reid import MotionModelSimpleReID
+from .model_simple_reid_v2 import MotionModelSimpleReIDV2
 from tracktor.reid.resnet import resnet50
 from tracktor.utils import interpolate, plot_sequence, get_mot_accum, evaluate_mot_accums
 
@@ -78,8 +80,10 @@ def main(tracktor, reid, _config, _log, _run):
     # neural motion model 
     # motion_model = MotionModelV2(vis_conv_only=False, use_modulator=False, use_bn=False)
     # motion_model.load_state_dict(torch.load('/home/tianjliu/MSc_project/output/tracktor/motion/motion_ecc_novisloss_nomod_nobn_jitter/motion_model_epoch_5.pth'))
-    motion_model = MotionModel(vis_conv_only=False)
-    motion_model.load_state_dict(torch.load('/cs/student/vbox/tianjliu/tracktor_output/motion_model/motion_model_epoch_28.pth'))
+    # motion_model = MotionModel(vis_conv_only=False)
+    # motion_model.load_state_dict(torch.load('/cs/student/vbox/tianjliu/tracktor_output/motion_model/motion_model_epoch_28.pth'))
+    motion_model = MotionModelSimpleReID(use_modulator=True, use_bn=False, use_residual=True, vis_roi_features=False, no_visrepr=True)
+    motion_model.load_state_dict(torch.load('/home/tianjliu/MSc_project/output/tracktor/motion/simple_ecc_ratio1_novisrepr_noroi_nobn/simple_reid_motion_model_epoch_5.pth'))
 
     motion_model.eval()
     motion_model.cuda()
