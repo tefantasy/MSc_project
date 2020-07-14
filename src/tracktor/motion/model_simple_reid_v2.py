@@ -6,7 +6,7 @@ from .utils import encode_motion, decode_motion, two_p_to_wh, wh_to_two_p
 
 class MotionModelSimpleReIDV2(nn.Module):
     def __init__(self, reid_dim=128, representation_dim=1024, motion_repr_dim=512, 
-                 use_modulator=True, use_bn=False, use_residual=True, vis_roi_features=True, no_visrepr=False):
+                 use_modulator=True, use_bn=False, use_residual=True, vis_roi_features=True, no_visrepr=False, modulate_from_vis=False):
         super(MotionModelSimpleReIDV2, self).__init__()
 
         self.reid_dim = reid_dim
@@ -18,6 +18,7 @@ class MotionModelSimpleReIDV2(nn.Module):
         self.use_residual = use_residual
         self.vis_roi_features = vis_roi_features
         self.no_visrepr = no_visrepr
+        self.modulate_from_vis = modulate_from_vis
 
         self.activation = nn.ReLU()
 
@@ -40,16 +41,13 @@ class MotionModelSimpleReIDV2(nn.Module):
             self.vis_out = nn.Linear(self.vis_repr_dim, 1)
 
             if use_residual:
-                if use_modulator:
-                    self.vis_modulate = nn.Sequential(
-                        nn.Linear(self.vis_repr_dim, 4),
-                        nn.Sigmoid()
-                    )
-                else:
-                    self.vis_modulate = nn.Sequential(
-                        nn.Linear(self.vis_repr_dim, 1),
-                        nn.Sigmoid()
-                    )
+                mod_in_channel = 1 if modulate_from_vis else self.vis_repr_dim
+                mod_out_channel = 4 if use_modulator else 1
+                
+                self.vis_modulate = nn.Sequential(
+                    nn.Linear(mod_in_channel, mod_out_channel),
+                    nn.Sigmoid()
+                )
             # motion branch #
             self.motion_repr = nn.Sequential(
                 nn.Linear(4, motion_repr_dim),
@@ -95,16 +93,13 @@ class MotionModelSimpleReIDV2(nn.Module):
             self.vis_out = nn.Linear(self.vis_repr_dim, 1)
 
             if use_residual:
-                if use_modulator:
-                    self.vis_modulate = nn.Sequential(
-                        nn.Linear(self.vis_repr_dim, 4),
-                        nn.Sigmoid()
-                    )
-                else:
-                    self.vis_modulate = nn.Sequential(
-                        nn.Linear(self.vis_repr_dim, 1),
-                        nn.Sigmoid()
-                    )
+                mod_in_channel = 1 if modulate_from_vis else self.vis_repr_dim
+                mod_out_channel = 4 if use_modulator else 1
+                
+                self.vis_modulate = nn.Sequential(
+                    nn.Linear(mod_in_channel, mod_out_channel),
+                    nn.Sigmoid()
+                )
             # motion branch #
             self.motion_repr = nn.Sequential(
                 nn.Linear(4, motion_repr_dim),
@@ -147,7 +142,10 @@ class MotionModelSimpleReIDV2(nn.Module):
         vis_output = torch.sigmoid(self.vis_out(vis_feature))
 
         if self.use_residual:
-            modulator = self.vis_modulate(vis_feature)
+            if self.modulate_from_vis:
+                modulator = self.vis_modulate(vis_output)
+            else:
+                modulator = self.vis_modulate(vis_feature)
 
         # motion
         motion_repr_feature = self.motion_repr(input_motion)

@@ -91,7 +91,7 @@ def weighted_smooth_l1_loss(pred, target, vis):
 
 
 def train_main(v2, use_refine_model, use_ecc, use_modulator, use_bn, use_residual, vis_roi_features, no_visrepr, vis_loss_ratio, no_vis_loss,
-               max_sample_frame, lr, weight_decay, batch_size, output_dir, ex_name):
+               modulate_from_vis, max_sample_frame, lr, weight_decay, batch_size, output_dir, ex_name):
     random.seed(12345)
     torch.manual_seed(12345)
     torch.cuda.manual_seed(12345)
@@ -107,8 +107,8 @@ def train_main(v2, use_refine_model, use_ecc, use_modulator, use_bn, use_residua
     with open(log_file, 'w') as f:
         f.write('[Experiment name]%s\n\n' % ex_name)
         f.write('[Parameters]\n')
-        f.write('use_ecc=%r\nuse_modulator=%r\nuse_bn=%r\nuse_residual=%r\nvis_roi_features=%r\nno_visrepr=%r\nvis_loss_ratio=%f\nno_vis_loss=%r\nmax_sample_frame=%d\nlr=%f\nweight_decay=%f\nbatch_size=%d\n\n' % 
-            (use_ecc, use_modulator, use_bn, use_residual, vis_roi_features, no_visrepr, vis_loss_ratio, no_vis_loss, max_sample_frame, lr, weight_decay, batch_size))
+        f.write('use_ecc=%r\nuse_modulator=%r\nuse_bn=%r\nuse_residual=%r\nvis_roi_features=%r\nno_visrepr=%r\nvis_loss_ratio=%f\nno_vis_loss=%r\nmodulate_from_vis=%r\nmax_sample_frame=%d\nlr=%f\nweight_decay=%f\nbatch_size=%d\n\n' % 
+            (use_ecc, use_modulator, use_bn, use_residual, vis_roi_features, no_visrepr, vis_loss_ratio, no_vis_loss, modulate_from_vis, max_sample_frame, lr, weight_decay, batch_size))
         f.write('[Loss log]\n')
 
     with open('experiments/cfgs/tracktor.yaml', 'r') as f:
@@ -139,10 +139,10 @@ def train_main(v2, use_refine_model, use_ecc, use_modulator, use_bn, use_residua
 
     if v2:
         motion_model = MotionModelSimpleReIDV2(use_modulator=use_modulator, use_bn=use_bn, use_residual=use_residual, 
-                                               vis_roi_features=vis_roi_features, no_visrepr=no_visrepr)
+                                               vis_roi_features=vis_roi_features, no_visrepr=no_visrepr, modulate_from_vis=modulate_from_vis)
     else:
         motion_model = MotionModelSimpleReID(use_modulator=use_modulator, use_bn=use_bn, use_residual=use_residual, 
-                                             vis_roi_features=vis_roi_features, no_visrepr=no_visrepr)
+                                             vis_roi_features=vis_roi_features, no_visrepr=no_visrepr, modulate_from_vis=modulate_from_vis)
     motion_model.train()
     motion_model.cuda()
 
@@ -315,6 +315,7 @@ if __name__ == '__main__':
     parser.add_argument('--no_visrepr', action='store_true')
     parser.add_argument('--vis_loss_ratio', type=float, default=1.0)
     parser.add_argument('--no_vis_loss', action='store_true')
+    parser.add_argument('--modulate_from_vis', action='store_true')
 
     parser.add_argument('--max_sample_frame', type=int, default=2)
     parser.add_argument('--v2', action='store_true')
@@ -324,5 +325,5 @@ if __name__ == '__main__':
     print(args)
 
     train_main(args.v2, args.refine_model, args.use_ecc, args.use_modulator, args.use_bn, args.use_residual, args.vis_roi_features, 
-               args.no_visrepr, args.vis_loss_ratio, args.no_vis_loss, args.max_sample_frame,
+               args.no_visrepr, args.vis_loss_ratio, args.no_vis_loss, args.modulate_from_vis, args.max_sample_frame,
                args.lr, args.weight_decay, args.batch_size, args.output_dir, args.ex_name)
