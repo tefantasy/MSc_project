@@ -11,6 +11,7 @@ from tracktor.motion.backbone_model import BackboneMotionModel
 from tracktor.motion.model_reid import MotionModelReID
 from tracktor.motion.model_simple_reid import MotionModelSimpleReID
 from tracktor.motion.model_simple_reid_v2 import MotionModelSimpleReIDV2
+from tracktor.motion.refine_model import RefineModel
 from tracktor.motion.utils import encode_motion, decode_motion, two_p_to_wh, wh_to_two_p
 from .utils import bbox_overlaps, warp_pos, get_center, get_height, get_width, make_pos
 
@@ -30,6 +31,7 @@ class TrackerNeuralMM(object):
         self.use_reid_motion_model = isinstance(motion_model, MotionModelReID)
         self.use_simple_reid_model = isinstance(motion_model, MotionModelSimpleReID)
         self.use_simple_reid_v2_model = isinstance(motion_model, MotionModelSimpleReIDV2)
+        self.use_refine_model = isinstance(motion_model, RefineModel)
 
         self.detection_person_thresh = tracker_cfg['detection_person_thresh']
         self.regression_person_thresh = tracker_cfg['regression_person_thresh']
@@ -266,14 +268,15 @@ class TrackerNeuralMM(object):
 
         return box_features, box_head_features
 
-    def motion(self, img):
+    def motion(self, img, new_img=None):
         """
         Apply neural motion model to all active tracks. Apply last_v to all inactive tracks. 
         Input:
             -img: LAST frame
+            -new_img: this frame. Mandatory if using RefineModel.
         """
         last_pos_1 = [t.last_pos[-2] for t in self.tracks]
-        last_pos_2 = [t.last_pos[-1] for t in self.tracks]
+        last_pos_2 = [t.last_pos[-1] for t in self.tracks] # same as t.pos
         last_pos_1 = torch.cat(last_pos_1, 0)
         last_pos_2 = torch.cat(last_pos_2, 0)
 
@@ -302,7 +305,7 @@ class TrackerNeuralMM(object):
 
             pred_motion = self.motion_model(historical_reid_features, curr_reid_features, 
                                             conv_features, repr_features, last_pos_1, last_pos_2, output_motion=True)
-        elif self.use_simple_reid_model or self.use_simple_reid_v2_model:
+        elif self.use_simple_reid_model or self.use_simple_reid_v2_model or self.use_refine_model:
             early_reid_features = torch.stack([torch.mean(torch.cat(t.early_features, 0), 0) for t in self.tracks], 0)
 
             pos_app = clip_boxes_to_image(pos_app, img.shape[-2:])
@@ -313,9 +316,13 @@ class TrackerNeuralMM(object):
             if self.use_simple_reid_model:
                 pred_motion = self.motion_model(early_reid_features, curr_reid_features, conv_features, repr_features,
                                                 last_pos_1, last_pos_2, output_motion=True)
-            else:
+            elif self.use_simple_reid_v2_model:
                 pred_motion = self.motion_model(early_reid_features, curr_reid_features, repr_features,
                                                 last_pos_1, last_pos_2, output_motion=True)
+            else:
+                # RefineModel
+                pred_motion = self.motion_model(self.obj_detect, [new_img], conv_features, repr_features, last_pos_1, last_pos_2,
+                                                early_reid=early_reid_features, curr_reid=curr_reid_features, output_motion=True)
 
         else:
             # MotionModel/MotionModelV2
@@ -358,7 +365,7 @@ class TrackerNeuralMM(object):
 
             # CHANGED apply neural motion model
             if self.motion_model_cfg['enabled']:
-                self.motion(self.last_image)
+                self.motion(self.last_image, blob['img'])
                 self.tracks = [t for t in self.tracks if t.has_positive_area()]
 
             # load the current frame

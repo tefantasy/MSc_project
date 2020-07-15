@@ -26,6 +26,7 @@ from tracktor.motion.backbone_model import BackboneMotionModel
 from tracktor.motion.model_reid import MotionModelReID
 from tracktor.motion.model_simple_reid import MotionModelSimpleReID
 from tracktor.motion.model_simple_reid_v2 import MotionModelSimpleReIDV2
+from tracktor.motion.refine_model import RefineModel
 from tracktor.reid.resnet import resnet50
 from tracktor.utils import interpolate, plot_sequence, get_mot_accum, evaluate_mot_accums
 

@@ -69,7 +69,7 @@ class RefineModel(nn.Module):
             return torch.stack(box_features_list, 0)
 
     def forward(self, obj_detect, label_img_list, roi_pool_output, representation_feature, previous_loc, curr_loc, 
-                historical_reid=None, early_reid=None, curr_reid=None):
+                historical_reid=None, early_reid=None, curr_reid=None, output_motion=False):
         if self.is_motion_model or self.is_motion_v2_model:
             pred_loc_wh, vis, vis_feature = self.motion_model(roi_pool_output, representation_feature, 
                                                               previous_loc, curr_loc, output_vis_feature=True)
@@ -96,5 +96,9 @@ class RefineModel(nn.Module):
 
         refined_pred_loc_wh = decode_motion(refinements, pred_loc_wh)
 
-        return refined_pred_loc_wh, vis
+        if output_motion:
+            curr_loc_wh = two_p_to_wh(curr_loc)
+            return encode_motion(curr_loc_wh, refined_pred_loc_wh)
+        else:
+            return refined_pred_loc_wh, vis
 
