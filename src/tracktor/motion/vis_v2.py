@@ -30,8 +30,8 @@ class VisModel(nn.Module):
 
         feature = self.backbone(curr_patch)
 
-        if use_early_reid:
-            if use_reid_distance:
+        if self.use_early_reid:
+            if self.use_reid_distance:
                 distance = torch.mean((early_reid - curr_reid) ** 2, 1, keepdim=True)
                 feature = torch.cat([feature, distance], 1)
             else:
