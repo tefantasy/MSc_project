@@ -47,7 +47,7 @@ def weighted_mse_loss(pred, target, vis_gt):
     return loss
 
 
-def train_main(use_early_reid, use_reid_distance, lr, weight_decay, batch_size, output_dir, ex_name):
+def train_main(use_early_reid, use_reid_distance, sgd, lr, weight_decay, batch_size, output_dir, ex_name):
     random.seed(12345)
     torch.manual_seed(12345)
     torch.cuda.manual_seed(12345)
@@ -92,7 +92,10 @@ def train_main(use_early_reid, use_reid_distance, lr, weight_decay, batch_size, 
     vis_model.train()
     vis_model.cuda()
 
-    optimizer = torch.optim.SGD(vis_model.parameters(), lr=lr, weight_decay=weight_decay, momentum=0.9)
+    if sgd:
+        optimizer = torch.optim.SGD(vis_model.parameters(), lr=lr, weight_decay=weight_decay, momentum=0.9)
+    else:
+        optimizer = torch.optim.Adam(vis_model.parameters(), lr=lr, weight_decay=weight_decay)
     loss_func = nn.MSELoss()
 
     #######################
@@ -190,6 +193,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--weight_decay', type=float, default=1e-5)
     parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--sgd', action='store_true')
 
     parser.add_argument('--use_early_reid', action='store_true')
     parser.add_argument('--use_reid_distance', action='store_true')
@@ -197,5 +201,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print(args)
 
-    train_main(args.use_early_reid, args.use_reid_distance, args.lr, args.weight_decay, args.batch_size, args.output_dir, args.ex_name)
+    train_main(args.use_early_reid, args.use_reid_distance, 
+               args.sgd, args.lr, args.weight_decay, args.batch_size, args.output_dir, args.ex_name)
 
