@@ -29,6 +29,7 @@ class VisModel(nn.Module):
             assert early_reid is not None and curr_reid is not None
 
         feature = self.backbone(curr_patch)
+        feature = torch.flatten(feature, 1)
 
         if self.use_early_reid:
             if self.use_reid_distance:
