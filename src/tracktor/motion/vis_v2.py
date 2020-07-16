@@ -6,6 +6,8 @@ import torchvision.models as models
 
 class VisModel(nn.Module):
     def __init__(self, use_early_reid=True, use_reid_distance=False):
+        super(VisModel, self).__init__()
+
         self.use_early_reid = use_early_reid
         self.use_reid_distance = use_reid_distance
 
