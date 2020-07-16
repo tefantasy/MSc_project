@@ -85,7 +85,7 @@ class MOT17Tracks(MOT17Sequence):
                         'last_frame' : track['start_frame'] + offset + self._track_len - 1
                     }
                     if self._simple_reid:
-                        early_len = min(3, offset + 1)
+                        early_len = min(5, offset + 1)
                         track_clip['early_start_frame'] = track['start_frame']
                         track_clip['early_im_path'] = track['im_path'][:early_len]
                         track_clip['early_gt'] = track['gt'][:early_len]
