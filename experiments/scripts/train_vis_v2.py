@@ -47,7 +47,7 @@ def weighted_mse_loss(pred, target, vis_gt):
     return loss
 
 
-def train_main(use_early_reid, use_reid_distance, sgd, lr, weight_decay, batch_size, output_dir, ex_name):
+def train_main(use_early_reid, use_reid_distance, mse_loss, sgd, lr, weight_decay, batch_size, output_dir, ex_name):
     random.seed(12345)
     torch.manual_seed(12345)
     torch.cuda.manual_seed(12345)
@@ -130,7 +130,7 @@ def train_main(use_early_reid, use_reid_distance, sgd, lr, weight_decay, batch_s
             optimizer.zero_grad()
 
             vis = vis_model(curr_patch, early_reid, curr_reid)
-            loss = weighted_mse_loss(vis, vis_gt, vis_gt)
+            loss = loss_func(vis, vis_gt) if mse_loss else weighted_mse_loss(vis, vis_gt, vis_gt)
             loss.backward()
             optimizer.step()
 
@@ -165,8 +165,8 @@ def train_main(use_early_reid, use_reid_distance, sgd, lr, weight_decay, batch_s
 
         mean_val_loss = np.mean(val_loss_iters)
         mean_val_weighted_loss = np.mean(val_weighted_loss_iters)
-        print('[Epoch %4d] train weighted loss %.6f, val weighted loss %.6f, val mse loss %.6f' % 
-               (epoch+1, mean_train_loss, mean_val_weighted_loss, mean_val_loss))
+        print('[Epoch %4d] train %s loss %.6f, val weighted loss %.6f, val mse loss %.6f' % 
+               (epoch+1, '' if mse_loss else 'weighted', mean_train_loss, mean_val_weighted_loss, mean_val_loss))
 
         vis_model.train()
 
@@ -182,8 +182,8 @@ def train_main(use_early_reid, use_reid_distance, sgd, lr, weight_decay, batch_s
             torch.save(vis_model.state_dict(), osp.join(output_dir, 'vis_model_epoch_%d.pth'%(epoch+1)))
 
         with open(log_file, 'a') as f:
-            f.write('[Epoch %4d] train weighted loss %.6f, val weighted loss %.6f, val mse loss %.6f %s\n' % 
-               (epoch+1, mean_train_loss, mean_val_weighted_loss, mean_val_loss, '*' if new_lowest_flag else ''))
+            f.write('[Epoch %4d] train %s loss %.6f, val weighted loss %.6f, val mse loss %.6f %s\n' % 
+               (epoch+1, '' if mse_loss else 'weighted', mean_train_loss, mean_val_weighted_loss, mean_val_loss, '*' if new_lowest_flag else ''))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -194,6 +194,7 @@ if __name__ == '__main__':
     parser.add_argument('--weight_decay', type=float, default=1e-5)
     parser.add_argument('--batch_size', type=int, default=32)
     parser.add_argument('--sgd', action='store_true')
+    parser.add_argument('--mse_loss', action='store_true')
 
     parser.add_argument('--use_early_reid', action='store_true')
     parser.add_argument('--use_reid_distance', action='store_true')
@@ -201,6 +202,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print(args)
 
-    train_main(args.use_early_reid, args.use_reid_distance, 
+    train_main(args.use_early_reid, args.use_reid_distance, args.mse_loss, 
                args.sgd, args.lr, args.weight_decay, args.batch_size, args.output_dir, args.ex_name)
 
