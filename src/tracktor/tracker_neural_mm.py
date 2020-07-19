@@ -392,7 +392,7 @@ class TrackerNeuralMM(object):
                                     last_pos_1, last_pos_2)
 
         for i, t in enumerate(self.tracks):
-            t.vis = vis[i]
+            t.vis = vis[i].item()
 
     def step(self, blob):
         """This function should be called every timestep to perform tracking with a blob
