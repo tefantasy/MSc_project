@@ -81,20 +81,22 @@ def main(tracktor, reid, _config, _log, _run):
     # neural motion model 
     # motion_model = MotionModelV2(vis_conv_only=False, use_modulator=False, use_bn=False)
     # motion_model.load_state_dict(torch.load('/home/tianjliu/MSc_project/output/tracktor/motion/motion_ecc_novisloss_nomod_nobn_jitter/motion_model_epoch_5.pth'))
-    # motion_model = MotionModel(vis_conv_only=False)
-    # motion_model.load_state_dict(torch.load('/cs/student/vbox/tianjliu/tracktor_output/motion_model/motion_model_epoch_28.pth'))
-    motion_model = MotionModelSimpleReID(use_modulator=True, use_bn=False, use_residual=True, vis_roi_features=False, no_visrepr=True)
-    motion_model.load_state_dict(torch.load('/home/tianjliu/MSc_project/output/tracktor/motion/simple_ecc_ratio1_novisrepr_noroi_nobn/simple_reid_motion_model_epoch_5.pth'))
+    motion_model = MotionModel(vis_conv_only=False)
+    motion_model.load_state_dict(torch.load('/cs/student/vbox/tianjliu/tracktor_output/motion_model/motion_model_epoch_28.pth'))
+    # motion_model = MotionModelSimpleReID(use_modulator=True, use_bn=False, use_residual=True, vis_roi_features=False, no_visrepr=True)
+    # motion_model.load_state_dict(torch.load('/home/tianjliu/MSc_project/output/tracktor/motion/simple_ecc_ratio1_novisrepr_noroi_nobn/simple_reid_motion_model_epoch_5.pth'))
 
     motion_model.eval()
     motion_model.cuda()
+
+    save_vis_results = True
 
     # tracktor
     if 'oracle' in tracktor:
         tracker = OracleTracker(obj_detect, reid_network, tracktor['tracker'], tracktor['oracle'])
     else:
         # tracker = Tracker(obj_detect, reid_network, tracktor['tracker'])
-        tracker = TrackerNeuralMM(obj_detect, reid_network, motion_model, tracktor['tracker'])
+        tracker = TrackerNeuralMM(obj_detect, reid_network, motion_model, tracktor['tracker'], save_vis_results=save_vis_results, vis_model=None)
 
     time_total = 0
     num_frames = 0
@@ -130,6 +132,9 @@ def main(tracktor, reid, _config, _log, _run):
 
         _log.info(f"Writing predictions to: {output_dir}")
         seq.write_results(results, output_dir)
+        if save_vis_results:
+            vis_results = tracker.get_vis_results()
+            seq.write_vis_results(vis_results, output_dir)
 
         if tracktor['write_images']:
             plot_sequence(results, seq, osp.join(output_dir, tracktor['dataset'], str(seq)))

@@ -219,6 +219,23 @@ class MOT17Sequence(Dataset):
                     y2 = bb[3]
                     writer.writerow([frame+1, i+1, x1+1, y1+1, x2-x1+1, y2-y1+1, -1, -1, -1, -1])
 
+    def write_vis_results(self, all_tracks, output_dir):
+        assert self._seq_name is not None, "[!] No seq_name, probably using combined database"
+
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        if "17" in self._dets:
+            file = osp.join(output_dir, 'MOT17-'+self._seq_name[6:8]+"-"+self._dets[:-2]+'-vis.txt')
+        else:
+            file = osp.join(output_dir, 'MOT16-'+self._seq_name[6:8]+'-vis.txt')
+
+        with open(file, 'w') as f:
+            writer = csv.writer(f, delimiter=',')
+            for i, track in all_tracks.items():
+                for frame, vis in track.items():
+                    writer.writerow([frame+1, i+1, vis])
+
 
 class MOT19Sequence(MOT17Sequence):
 

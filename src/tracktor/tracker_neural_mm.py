@@ -7,6 +7,8 @@ from torch.autograd import Variable
 from scipy.optimize import linear_sum_assignment
 import cv2
 
+from tracktor.motion.model import MotionModel
+from tracktor.motion.model_v2 import MotionModelV2
 from tracktor.motion.backbone_model import BackboneMotionModel
 from tracktor.motion.model_reid import MotionModelReID
 from tracktor.motion.model_simple_reid import MotionModelSimpleReID
@@ -23,7 +25,7 @@ class TrackerNeuralMM(object):
     # only track pedestrian
     cl = 1
 
-    def __init__(self, obj_detect, reid_network, motion_model, tracker_cfg):
+    def __init__(self, obj_detect, reid_network, motion_model, tracker_cfg, save_vis_results=False, vis_model=None):
         self.obj_detect = obj_detect
         self.reid_network = reid_network
         self.motion_model = motion_model
@@ -32,6 +34,10 @@ class TrackerNeuralMM(object):
         self.use_simple_reid_model = isinstance(motion_model, MotionModelSimpleReID)
         self.use_simple_reid_v2_model = isinstance(motion_model, MotionModelSimpleReIDV2)
         self.use_refine_model = isinstance(motion_model, RefineModel)
+        self.save_vis_results = save_vis_results
+        if save_vis_results:
+            assert not self.use_refine_model
+            self.vis_model = motion_model if vis_model is None else vis_model
 
         self.detection_person_thresh = tracker_cfg['detection_person_thresh']
         self.regression_person_thresh = tracker_cfg['regression_person_thresh']
@@ -55,6 +61,7 @@ class TrackerNeuralMM(object):
         self.track_num = 0
         self.im_index = 0
         self.results = {}
+        self.vis_results = {}
 
     def reset(self, hard=True):
         self.tracks = []
@@ -63,6 +70,7 @@ class TrackerNeuralMM(object):
         if hard:
             self.track_num = 0
             self.results = {}
+            self.vis_results = {}
             self.im_index = 0
 
     def tracks_to_inactive(self, tracks):
@@ -272,8 +280,8 @@ class TrackerNeuralMM(object):
         """
         Apply neural motion model to all active tracks. Apply last_v to all inactive tracks. 
         Input:
-            -img: LAST frame
-            -new_img: this frame. Mandatory if using RefineModel.
+            -img: (3, h, w) LAST frame
+            -new_img: (1, 3, h, w) this frame. Mandatory if using RefineModel.
         """
         last_pos_1 = [t.last_pos[-2] for t in self.tracks]
         last_pos_2 = [t.last_pos[-1] for t in self.tracks] # same as t.pos
@@ -345,6 +353,47 @@ class TrackerNeuralMM(object):
                 if t.last_v.nelement() > 0:
                     t.pos = t.pos + t.last_v
 
+    def check_vis_results(self):
+        # dummy inputs. do not affect the vis results
+        last_pos_1 = [t.last_pos[-2] for t in self.tracks]
+        last_pos_2 = [t.last_pos[-1] for t in self.tracks] # same as t.pos
+        last_pos_1 = torch.cat(last_pos_1, 0)
+        last_pos_2 = torch.cat(last_pos_2, 0)
+
+        curr_pos = self.get_pos()
+        curr_pos = clip_boxes_to_image(curr_pos, self.last_image.shape[-2:])
+
+        conv_features, repr_features = self.get_pooled_features(curr_pos)
+
+        if isinstance(self.vis_model, MotionModel) or isinstance(self.vis_model, MotionModelV2):
+            _, vis = self.vis_model(conv_features, repr_features, last_pos_1, last_pos_2)
+        elif isinstance(self.vis_model, BackboneMotionModel):
+            img = [self.last_image.cuda()]
+            target = [{"boxes": curr_pos}]
+
+            _, vis = self.vis_model(img, target, last_pos_1, last_pos_2)
+        elif isinstance(self.vis_model, MotionModelReID):
+            historical_reid_features = [torch.cat(list(t.features), 0) for t in self.tracks]
+            curr_reid_features = self.reid_network.test_rois(self.last_image.unsqueeze(0), curr_pos)
+
+            _, vis = self.vis_model(historical_reid_features, curr_reid_features, 
+                                    conv_features, repr_features, last_pos_1, last_pos_2)
+        elif isinstance(self.vis_model, MotionModelSimpleReID):
+            early_reid_features = torch.stack([torch.mean(torch.cat(t.early_features, 0), 0) for t in self.tracks], 0)
+            curr_reid_features = self.reid_network.test_rois(self.last_image.unsqueeze(0), curr_pos)
+
+            _, vis = self.vis_model(early_reid_features, curr_reid_features, conv_features, repr_features,
+                                    last_pos_1, last_pos_2)
+        elif isinstance(self.vis_model, MotionModelSimpleReIDV2):
+            early_reid_features = torch.stack([torch.mean(torch.cat(t.early_features, 0), 0) for t in self.tracks], 0)
+            curr_reid_features = self.reid_network.test_rois(self.last_image.unsqueeze(0), curr_pos)
+
+            _, vis = self.vis_model(early_reid_features, curr_reid_features, repr_features,
+                                    last_pos_1, last_pos_2)
+
+        for i, t in enumerate(self.tracks):
+            t.vis = vis[i]
+
     def step(self, blob):
         """This function should be called every timestep to perform tracking with a blob
         containing the image information.
@@ -380,6 +429,13 @@ class TrackerNeuralMM(object):
                 if self.do_reid:
                     new_features = self.get_appearances(blob)
                     self.add_features(new_features)
+
+                # check vis result for next time step
+                if self.save_vis_results:
+                    self.obj_detect.load_image(self.last_image.unsqueeze(0))
+                    self.check_vis_results()
+                    self.obj_detect.load_image(blob['img'])
+
         else:
             self.obj_detect.load_image(blob['img'])
 
@@ -461,6 +517,12 @@ class TrackerNeuralMM(object):
             if t.id not in self.results.keys():
                 self.results[t.id] = {}
             self.results[t.id][self.im_index] = np.concatenate([t.pos[0].cpu().numpy(), np.array([t.score])])
+        
+        if self.save_vis_results:    
+            for t in self.tracks:
+                if t.id not in self.vis_results.keys():
+                    self.vis_results[t.id] = {}
+                self.vis_results[t.id][self.im_index] = t.vis
 
         for t in self.inactive_tracks:
             t.count_inactive += 1
@@ -474,6 +536,9 @@ class TrackerNeuralMM(object):
 
     def get_results(self):
         return self.results
+
+    def get_vis_results(self):
+        return self.vis_results
 
 
 class Track(object):
@@ -491,6 +556,8 @@ class Track(object):
         self.last_pos = deque([pos.clone()], maxlen=mm_steps + 1)
         self.last_v = torch.Tensor([])
         self.gt_id = None
+
+        self.vis = -2.0
 
         self.init_motion = False
 
