@@ -138,9 +138,10 @@ def train_main(sgd, lr, weight_decay, batch_size, output_dir, ex_name):
         val_loss_iters = []
 
         for data in train_loader:
-            early_reid = get_batch_mean_early_reid(reid_network, data['early_reid_patches'])
-            curr_reid = reid_network(data['curr_reid_patch'].cuda())
-            conv_features, repr_features = get_features(obj_detect, data['curr_img'], data['curr_gt_app'])
+            with torch.no_grad():
+                early_reid = get_batch_mean_early_reid(reid_network, data['early_reid_patches'])
+                curr_reid = reid_network(data['curr_reid_patch'].cuda())
+                conv_features, repr_features = get_features(obj_detect, data['curr_img'], data['curr_gt_app'])
 
             curr_vis = data['curr_vis'].cuda()
             
