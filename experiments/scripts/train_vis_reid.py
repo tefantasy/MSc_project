@@ -51,13 +51,14 @@ def get_features(obj_detect, img_list, gts):
     return torch.stack(box_features_list, 0), torch.stack(box_head_features_list, 0)
 
 def get_batch_mean_early_reid(reid_model, early_reid_patches):
-    batch_reid_features = []
-    for reid_patch in early_reid_patches:
-        reid_features = reid_model(reid_patch.cuda())
-        reid_features = torch.mean(reid_features, 0)
-        batch_reid_features.append(reid_features)
-    batch_reid_features = torch.stack(batch_reid_features, 0)
-    return batch_reid_features
+    with torch.no_grad():
+        batch_reid_features = []
+        for reid_patch in early_reid_patches:
+            reid_features = reid_model(reid_patch.cuda())
+            reid_features = torch.mean(reid_features, 0)
+            batch_reid_features.append(reid_features)
+        batch_reid_features = torch.stack(batch_reid_features, 0)
+        return batch_reid_features
 
 
 
