@@ -74,7 +74,7 @@ class MotionModelV3(nn.Module):
         motion_repr_feature = self.motion_repr(input_motion)
 
         # vis and modulate
-        vis_output = self.vis_model(early_reid, curr_reid, roi_pool_output, representation_feature)
+        vis_output = self.vis_model(early_reid, curr_reid, roi_pool_output, representation_feature).unsqueeze(-1)
         modulator = self.vis_modulate(vis_output)
 
         # motion residual prediction
