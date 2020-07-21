@@ -22,6 +22,8 @@ from tracktor.motion.vis_simple_reid import VisSimpleReID
 from tracktor.motion.model_v3 import MotionModelV3
 from tracktor.reid.resnet import resnet50
 
+from tracktor.motion.utils import two_p_to_wh
+
 def get_features(obj_detect, img_list, gts):
     """
     Input:
