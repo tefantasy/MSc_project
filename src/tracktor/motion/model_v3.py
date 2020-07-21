@@ -89,4 +89,4 @@ class MotionModelV3(nn.Module):
             return pred_motion
         else:
             pred_loc_wh = decode_motion(pred_motion, curr_loc_wh)
-            return pred_loc_wh, vis_output
+            return pred_loc_wh, vis_output.squeeze(-1)
