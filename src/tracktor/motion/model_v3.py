@@ -5,11 +5,12 @@ from .vis_simple_reid import VisSimpleReID
 from .utils import encode_motion, decode_motion, two_p_to_wh, wh_to_two_p
 
 class MotionModelV3(nn.Module):
-    def __init__(self, vis_model, roi_output_dim=256, pool_size=7, representation_dim=1024, motion_repr_dim=512):
+    def __init__(self, vis_model, roi_output_dim=256, pool_size=7, representation_dim=1024, motion_repr_dim=512, no_modulator=False):
         super(MotionModelV3, self).__init__()
 
         self.vis_model = vis_model
         assert isinstance(vis_model, VisSimpleReID)
+        self.use_modulator = (not no_modulator)
 
         self.activation = nn.ReLU()
 
@@ -28,10 +29,11 @@ class MotionModelV3(nn.Module):
         )
 
         # modulator #
-        self.vis_modulate = nn.Sequential(
-            nn.Linear(1, 4),
-            nn.Sigmoid()
-        )
+        if self.use_modulator:
+            self.vis_modulate = nn.Sequential(
+                nn.Linear(1, 4),
+                nn.Sigmoid()
+            )
 
         # motion branch #
         self.motion_repr = nn.Sequential(
@@ -75,7 +77,11 @@ class MotionModelV3(nn.Module):
 
         # vis and modulate
         vis_output = self.vis_model(early_reid, curr_reid, roi_pool_output, representation_feature).unsqueeze(-1)
-        modulator = self.vis_modulate(vis_output)
+
+        if self.use_modulator:
+            modulator = self.vis_modulate(vis_output)
+        else:
+            modulator = vis_output
 
         # motion residual prediction
         motion_residual = self.motion_regress(
