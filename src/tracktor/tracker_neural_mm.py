@@ -14,6 +14,7 @@ from tracktor.motion.model_reid import MotionModelReID
 from tracktor.motion.model_simple_reid import MotionModelSimpleReID
 from tracktor.motion.model_simple_reid_v2 import MotionModelSimpleReIDV2
 from tracktor.motion.refine_model import RefineModel
+from tracktor.motion.model_v3 import MotionModelV3
 from tracktor.motion.utils import encode_motion, decode_motion, two_p_to_wh, wh_to_two_p
 from .utils import bbox_overlaps, warp_pos, get_center, get_height, get_width, make_pos
 
@@ -34,6 +35,7 @@ class TrackerNeuralMM(object):
         self.use_simple_reid_model = isinstance(motion_model, MotionModelSimpleReID)
         self.use_simple_reid_v2_model = isinstance(motion_model, MotionModelSimpleReIDV2)
         self.use_refine_model = isinstance(motion_model, RefineModel)
+        self.use_v3_model = isinstance(motion_model, MotionModelV3)
         self.save_vis_results = save_vis_results
         if save_vis_results:
             assert not self.use_refine_model
@@ -313,7 +315,7 @@ class TrackerNeuralMM(object):
 
             pred_motion = self.motion_model(historical_reid_features, curr_reid_features, 
                                             conv_features, repr_features, last_pos_1, last_pos_2, output_motion=True)
-        elif self.use_simple_reid_model or self.use_simple_reid_v2_model or self.use_refine_model:
+        elif self.use_simple_reid_model or self.use_simple_reid_v2_model or self.use_refine_model or self.use_v3_model:
             early_reid_features = torch.stack([torch.mean(torch.cat(t.early_features, 0), 0) for t in self.tracks], 0)
 
             pos_app = clip_boxes_to_image(pos_app, img.shape[-2:])
@@ -321,7 +323,7 @@ class TrackerNeuralMM(object):
 
             conv_features, repr_features = self.get_pooled_features(pos_app)
 
-            if self.use_simple_reid_model:
+            if self.use_simple_reid_model or self.use_v3_model:
                 pred_motion = self.motion_model(early_reid_features, curr_reid_features, conv_features, repr_features,
                                                 last_pos_1, last_pos_2, output_motion=True)
             elif self.use_simple_reid_v2_model:
@@ -378,7 +380,7 @@ class TrackerNeuralMM(object):
 
             _, vis = self.vis_model(historical_reid_features, curr_reid_features, 
                                     conv_features, repr_features, last_pos_1, last_pos_2)
-        elif isinstance(self.vis_model, MotionModelSimpleReID):
+        elif isinstance(self.vis_model, MotionModelSimpleReID) or isinstance(self.vis_model, MotionModelV3):
             early_reid_features = torch.stack([torch.mean(torch.cat(t.early_features, 0), 0) for t in self.tracks], 0)
             curr_reid_features = self.reid_network.test_rois(self.last_image.unsqueeze(0), curr_pos)
 
