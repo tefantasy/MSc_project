@@ -194,8 +194,9 @@ class MOT17SimpleReIDWrapper(Dataset):
         # jittering
         if self.is_train:
             early_gt = self.bbox_jitter(early_gt, im_w, im_h, noise_scale=0.05)
-            curr_gt_app = self.bbox_jitter([curr_gt], im_w, im_h, noise_scale=0.05)[0]
+            # curr_gt_app = self.bbox_jitter([curr_gt], im_w, im_h, noise_scale=0.05)[0]
             curr_gt = self.bbox_jitter([curr_gt], im_w, im_h, noise_scale=0.05, clip=False)[0]
+            curr_gt_app = self.bbox_clip_to_image([curr_gt], im_w, im_h)[0]
         else:
             early_gt = self.bbox_clip_to_image(early_gt, im_w, im_h)
             curr_gt_app = self.bbox_clip_to_image([curr_gt], im_w, im_h)[0]
