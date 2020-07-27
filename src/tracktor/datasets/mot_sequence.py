@@ -23,7 +23,8 @@ class MOT17Sequence(Dataset):
 
     def __init__(self, seq_name=None, dets='', vis_threshold=0.0,
                  normalize_mean=[0.485, 0.456, 0.406],
-                 normalize_std=[0.229, 0.224, 0.225]):
+                 normalize_std=[0.229, 0.224, 0.225],
+                 use_val_split=False):
         """
         Args:
             seq_name (string): Sequence to take
@@ -33,10 +34,15 @@ class MOT17Sequence(Dataset):
         self._dets = dets
         self._vis_threshold = vis_threshold
 
-        self._mot_dir = osp.join(cfg.DATA_DIR, 'MOT17Det')
-        self._label_dir = osp.join(cfg.DATA_DIR, 'MOT16Labels')
-        self._raw_label_dir = osp.join(cfg.DATA_DIR, 'MOT16-det-dpm-raw')
-        self._mot17_label_dir = osp.join(cfg.DATA_DIR, 'MOT17Labels')
+        if use_val_split:
+            data_dir = osp.join(cfg.DATA_DIR, 'MOT17-val')
+        else:
+            data_dir = cfg.DATA_DIR
+        
+        self._mot_dir = osp.join(data_dir, 'MOT17Det')
+        self._label_dir = osp.join(data_dir, 'MOT16Labels')
+        self._raw_label_dir = osp.join(data_dir, 'MOT16-det-dpm-raw')
+        self._mot17_label_dir = osp.join(data_dir, 'MOT17Labels')
 
         self._train_folders = os.listdir(os.path.join(self._mot_dir, 'train'))
         self._test_folders = os.listdir(os.path.join(self._mot_dir, 'test'))
