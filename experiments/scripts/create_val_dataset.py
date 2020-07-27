@@ -61,7 +61,7 @@ for seq_name in train_folders:
 
     train_len = int(math.floor(seq_len * 0.8))
     val_len = seq_len - train_len
-    config['Sequence']['seqLength'] = val_len
+    config['Sequence']['seqLength'] = str(val_len)
     with open(osp.join(out_seq_dir, 'seqinfo.ini'), 'w') as f:
         config.write(f, space_around_delimiters=False)
 
