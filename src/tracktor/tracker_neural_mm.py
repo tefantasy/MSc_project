@@ -53,6 +53,7 @@ class TrackerNeuralMM(object):
         self.reid_iou_threshold = tracker_cfg['reid_iou_threshold']
         self.do_align = tracker_cfg['do_align']
         self.motion_model_cfg = tracker_cfg['motion_model']
+        self.low_score_patience = 6
 
         self.warp_mode = eval(tracker_cfg['warp_mode'])
         self.number_of_iterations = tracker_cfg['number_of_iterations']
@@ -115,8 +116,13 @@ class TrackerNeuralMM(object):
             t = self.tracks[i]
             t.score = scores[i]
             if scores[i] <= self.regression_person_thresh:
-                self.tracks_to_inactive([t])
+                # self.tracks_to_inactive([t])
+                t.low_score_length += 1
+                if t.low_score_length > self.low_score_patience:
+                    self.tracks_to_inactive([t])
             else:
+                t.low_score_length = 0
+                
                 s.append(scores[i])
                 if t.init_motion:
                     t.pos = regress_pos[i].view(1, -1)
@@ -560,6 +566,7 @@ class Track(object):
         self.gt_id = None
 
         self.vis = -2.0
+        self.low_score_length = 0
 
         self.init_motion = False
 
