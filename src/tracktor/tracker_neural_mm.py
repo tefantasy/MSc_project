@@ -115,7 +115,7 @@ class TrackerNeuralMM(object):
         for i in range(len(self.tracks) - 1, -1, -1):
             t = self.tracks[i]
             t.score = scores[i]
-            if scores[i] <= 0.05 or t.low_score_length >= self.low_score_patience:
+            if t.low_score_length >= self.low_score_patience:
                 self.tracks_to_inactive([t])
             else:
                 if scores[i] <= self.regression_person_thresh:
