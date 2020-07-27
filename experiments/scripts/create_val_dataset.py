@@ -42,6 +42,8 @@ os.mkdir(osp.join(label_dir, 'test'))
 
 data_dir = osp.join(data_dir, 'train')
 label_dir = osp.join(label_dir, 'train')
+os.mkdir(data_dir)
+os.mkdir(label_dir)
 
 train_folders = ['MOT17-02', 'MOT17-04', 'MOT17-05', 'MOT17-09', 'MOT17-10',
                          'MOT17-11', 'MOT17-13']
