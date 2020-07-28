@@ -19,6 +19,7 @@ from tracktor.datasets.mot17_simple_reid_wrapper import MOT17SimpleReIDWrapper, 
 
 from tracktor.frcnn_fpn import FRCNN_FPN
 from tracktor.motion.vis_simple_reid import VisSimpleReID
+from tracktor.motion.visibility import VisEst
 from tracktor.motion.model_v3 import MotionModelV3
 from tracktor.reid.resnet import resnet50
 
@@ -63,7 +64,8 @@ def get_batch_mean_early_reid(reid_model, early_reid_patches):
         batch_reid_features = torch.stack(batch_reid_features, 0)
         return batch_reid_features
 
-def train_main(no_modulator, max_sample_frame, sgd, lr, weight_decay, batch_size, pretrained_path, output_dir, ex_name):
+def train_main(vis_no_reid, no_vis_model, no_motion_repr, no_modulator, max_sample_frame, 
+               sgd, lr, weight_decay, batch_size, pretrained_path, output_dir, ex_name):
     random.seed(12345)
     torch.manual_seed(12345)
     torch.cuda.manual_seed(12345)
@@ -80,8 +82,8 @@ def train_main(no_modulator, max_sample_frame, sgd, lr, weight_decay, batch_size
         f.write('[Experiment name]%s\n' % ex_name)
         f.write('[Pretrained]%s\n\n' % pretrained_path)
         f.write('[Parameters]\n')
-        f.write('no_modulator=%r\nmax_sample_frame=%d\nlr=%f\nweight_decay=%f\nbatch_size=%d\n\n' % 
-            (no_modulator, max_sample_frame, lr, weight_decay, batch_size))
+        f.write('vis_no_reid=%r\nno_vis_model=%r\nno_motion_repr=%r\nno_modulator=%r\nmax_sample_frame=%d\nlr=%f\nweight_decay=%f\nbatch_size=%d\n\n' % 
+            (vis_no_reid, no_vis_model, no_motion_repr, no_modulator, max_sample_frame, lr, weight_decay, batch_size))
         f.write('[Loss log]\n')
 
     with open('experiments/cfgs/tracktor.yaml', 'r') as f:
@@ -116,11 +118,17 @@ def train_main(no_modulator, max_sample_frame, sgd, lr, weight_decay, batch_size
     reid_network.eval()
     reid_network.cuda()
 
-    vis_model = VisSimpleReID()
-    vis_model.load_state_dict(torch.load(pretrained_path,
-                              map_location=lambda storage, loc: storage))
+    if not no_vis_model:
+        if vis_no_reid:
+            vis_model = VisEst(conv_only=False)
+        else:
+            vis_model = VisSimpleReID()
+        vis_model.load_state_dict(torch.load(pretrained_path,
+                                  map_location=lambda storage, loc: storage))
+    else:
+        vis_model = None
 
-    motion_model = MotionModelV3(vis_model, no_modulator=no_modulator)
+    motion_model = MotionModelV3(vis_model, no_modulator=no_modulator, use_vis_model=(not no_vis_model), use_motion_repr=(not no_motion_repr))
 
     motion_model.train()
     motion_model.cuda()
@@ -177,22 +185,27 @@ def train_main(no_modulator, max_sample_frame, sgd, lr, weight_decay, batch_size
             label_loc_wh = two_p_to_wh(label_loc)
 
             pred_loss = pred_loss_func(pred_loc_wh, label_loc_wh)
-            vis_loss = vis_loss_func(vis, curr_vis)
+            if not no_vis_model:
+                vis_loss = vis_loss_func(vis, curr_vis)
 
             pred_loss.backward()
             optimizer.step()
 
             train_pred_loss_iters.append(pred_loss.item())
-            train_vis_loss_iters.append(vis_loss.item())
+            if not no_vis_model: train_vis_loss_iters.append(vis_loss.item())
             if n_iter % log_freq == 0:
-                print('[Train Iter %5d] train pred loss %.6f, vis loss %.6f ...' % 
-                    (n_iter, np.mean(train_pred_loss_iters[n_iter-log_freq:n_iter]), np.mean(train_vis_loss_iters[n_iter-log_freq:n_iter])),
-                    flush=True)
+                if no_vis_model:
+                    print('[Train Iter %5d] train pred loss %.6f' % (n_iter, np.mean(train_pred_loss_iters[n_iter-log_freq:n_iter])), flush=True)
+                else:
+                    print('[Train Iter %5d] train pred loss %.6f, vis loss %.6f ...' % 
+                         (n_iter, np.mean(train_pred_loss_iters[n_iter-log_freq:n_iter]), np.mean(train_vis_loss_iters[n_iter-log_freq:n_iter])),
+                         flush=True)
 
         mean_train_pred_loss = np.mean(train_pred_loss_iters)
-        mean_train_vis_loss = np.mean(train_vis_loss_iters)
         train_pred_loss_epochs.append(mean_train_pred_loss)
-        train_vis_loss_epochs.append(mean_train_vis_loss)
+        if not no_vis_model:
+            mean_train_vis_loss = np.mean(train_vis_loss_iters)
+            train_vis_loss_epochs.append(mean_train_vis_loss)
         print('Train epoch %4d end.' % (epoch + 1))
 
         motion_model.eval()
@@ -212,18 +225,24 @@ def train_main(no_modulator, max_sample_frame, sgd, lr, weight_decay, batch_size
                 label_loc_wh = two_p_to_wh(label_loc)
 
                 pred_loss = pred_loss_func(pred_loc_wh, label_loc_wh)
-                vis_loss = vis_loss_func(vis, curr_vis)
-
                 val_pred_loss_iters.append(pred_loss.item())
-                val_vis_loss_iters.append(vis_loss.item())
+
+                if not no_vis_model:
+                    vis_loss = vis_loss_func(vis, curr_vis)
+                    val_vis_loss_iters.append(vis_loss.item())
 
         mean_val_pred_loss = np.mean(val_pred_loss_iters)
-        mean_val_vis_loss = np.mean(val_vis_loss_iters)
         val_pred_loss_epochs.append(mean_val_pred_loss)
-        val_vis_loss_epochs.append(mean_val_vis_loss)
+        if not no_vis_model:
+            mean_val_vis_loss = np.mean(val_vis_loss_iters)
+            val_vis_loss_epochs.append(mean_val_vis_loss)
 
-        print('[Epoch %4d] train pred loss %.6f, vis loss %.6f; val pred loss %.6f, vis loss %.6f' % 
-            (epoch+1, mean_train_pred_loss, mean_train_vis_loss, mean_val_pred_loss, mean_val_vis_loss))
+        if no_vis_model:
+            print('[Epoch %4d] train pred loss %.6f; val pred loss %.6f' % 
+                  (epoch+1, mean_train_pred_loss, mean_val_pred_loss))
+        else:
+            print('[Epoch %4d] train pred loss %.6f, vis loss %.6f; val pred loss %.6f, vis loss %.6f' % 
+                  (epoch+1, mean_train_pred_loss, mean_train_vis_loss, mean_val_pred_loss, mean_val_vis_loss))
 
         motion_model.train()
 
@@ -237,8 +256,12 @@ def train_main(no_modulator, max_sample_frame, sgd, lr, weight_decay, batch_size
             torch.save(motion_model.state_dict(), osp.join(output_dir, 'finetune_motion_model_epoch_%d.pth'%(epoch+1)))
 
         with open(log_file, 'a') as f:
-            f.write('Epoch %4d: train pred loss %.6f, vis loss %.6f; val pred loss %.6f, vis loss %.6f %s\n' % 
-                (epoch+1, mean_train_pred_loss, mean_train_vis_loss, mean_val_pred_loss, mean_val_vis_loss, '*' if new_lowest_flag else ''))
+            if no_vis_model:
+                f.write('[Epoch %4d] train pred loss %.6f; val pred loss %.6f %s\n' % 
+                        (epoch+1, mean_train_pred_loss, mean_val_pred_loss, '*' if new_lowest_flag else ''))
+            else:
+                f.write('Epoch %4d: train pred loss %.6f, vis loss %.6f; val pred loss %.6f, vis loss %.6f %s\n' % 
+                    (epoch+1, mean_train_pred_loss, mean_train_vis_loss, mean_val_pred_loss, mean_val_vis_loss, '*' if new_lowest_flag else ''))
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -253,10 +276,14 @@ if __name__ == '__main__':
 
     parser.add_argument('--max_sample_frame', type=int, default=2)
     parser.add_argument('--no_modulator', action='store_true')
+    parser.add_argument('--vis_no_reid', action='store_true')
+    parser.add_argument('--no_vis_model', action='store_true')
+    parser.add_argument('--no_motion_repr', action='store_true')
 
     args = parser.parse_args()
     print(args)
 
-    train_main(args.no_modulator, args.max_sample_frame, args.sgd, args.lr, args.weight_decay, args.batch_size, 
+    train_main(args.vis_no_reid, args.no_vis_model, args.no_motion_repr, args.no_modulator, args.max_sample_frame, 
+               args.sgd, args.lr, args.weight_decay, args.batch_size, 
                args.pretrained_path, args.output_dir, args.ex_name)
 
