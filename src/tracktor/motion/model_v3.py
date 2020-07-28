@@ -99,7 +99,6 @@ class MotionModelV3(nn.Module):
                 vis_output = self.vis_model(early_reid, curr_reid, roi_pool_output, representation_feature).unsqueeze(-1)
             else:
                 vis_output, _ = self.vis_model(roi_pool_output, representation_feature)
-                vis_output = vis_output.unsqueeze(-1)
 
             if self.use_modulator:
                 modulator = self.vis_modulate(vis_output)
