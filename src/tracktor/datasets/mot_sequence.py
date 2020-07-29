@@ -242,8 +242,7 @@ class MOT17Sequence(Dataset):
                 for frame, vis in track.items():
                     writer.writerow([frame+1, i+1, vis])
 
-
-class MOT19Sequence(MOT17Sequence):
+class MOT20Sequence(MOT17Sequence):
 
     def __init__(self, seq_name=None, dets='', vis_threshold=0.0,
                  normalize_mean=[0.485, 0.456, 0.406],
@@ -257,10 +256,10 @@ class MOT19Sequence(MOT17Sequence):
         self._dets = dets
         self._vis_threshold = vis_threshold
 
-        self._mot_dir = osp.join(cfg.DATA_DIR, 'MOT19')
-        self._mot17_label_dir = osp.join(cfg.DATA_DIR, 'MOT19')
+        self._mot_dir = osp.join(cfg.DATA_DIR, 'MOT20')
+        self._mot17_label_dir = osp.join(cfg.DATA_DIR, 'MOT20')
 
-        # TODO: refactor code of both classes to consider 16,17 and 19
+        # TODO: refactor code of both classes to consider 16,17 and 20
         self._label_dir = osp.join(cfg.DATA_DIR, 'MOT16Labels')
         self._raw_label_dir = osp.join(cfg.DATA_DIR, 'MOT16-det-dpm-raw')
 
@@ -280,7 +279,7 @@ class MOT19Sequence(MOT17Sequence):
 
     def get_det_file(self, label_path, raw_label_path, mot17_label_path):
         # FRCNN detections
-        if "MOT19" in self._seq_name:
+        if "MOT20" in self._seq_name:
             det_file = osp.join(mot17_label_path, self._seq_name, 'det', 'det.txt')
         else:
             det_file = ""
@@ -306,6 +305,20 @@ class MOT19Sequence(MOT17Sequence):
                     y2 = bb[3]
                     writer.writerow(
                         [frame + 1, i + 1, x1 + 1, y1 + 1, x2 - x1 + 1, y2 - y1 + 1, -1, -1, -1, -1])
+
+    def write_vis_results(self, all_tracks, output_dir):
+        assert self._seq_name is not None, "[!] No seq_name, probably using combined database"
+
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+
+        file = osp.join(output_dir, f'{self._seq_name}-vis.txt')
+
+        with open(file, 'w') as f:
+            writer = csv.writer(f, delimiter=',')
+            for i, track in all_tracks.items():
+                for frame, vis in track.items():
+                    writer.writerow([frame+1, i+1, vis])
 
 
 class MOT17LOWFPSSequence(MOT17Sequence):
