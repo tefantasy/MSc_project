@@ -26,6 +26,8 @@ from tracktor.motion.backbone_model import BackboneMotionModel
 from tracktor.motion.model_reid import MotionModelReID
 from tracktor.motion.model_simple_reid import MotionModelSimpleReID
 from tracktor.motion.model_simple_reid_v2 import MotionModelSimpleReIDV2
+from tracktor.motion.model_v3 import MotionModelV3
+from tracktor.motion.vis_simple_reid import VisSimpleReID
 from tracktor.motion.refine_model import RefineModel
 from tracktor.reid.resnet import resnet50
 from tracktor.utils import interpolate, plot_sequence, get_mot_accum, evaluate_mot_accums
@@ -80,16 +82,27 @@ def main(tracktor, reid, _config, _log, _run):
 
     # neural motion model 
     # motion_model = MotionModelV2(vis_conv_only=False, use_modulator=False, use_bn=False)
-    # motion_model.load_state_dict(torch.load('/home/tianjliu/MSc_project/output/tracktor/motion/motion_ecc_novisloss_nomod_nobn_jitter/motion_model_epoch_5.pth'))
-    motion_model = MotionModel(vis_conv_only=False)
-    motion_model.load_state_dict(torch.load('/cs/student/vbox/tianjliu/tracktor_output/motion_model/motion_model_epoch_28.pth'))
+    # motion_model.load_state_dict(torch.load('/cs/student/vbox/tianjliu/tracktor_output/motion_model/motion_ecc_novisloss_nomod_nobn/motion_model_epoch_21.pth'))
+    # motion_model = MotionModel(vis_conv_only=False)
+    # motion_model.load_state_dict(torch.load('/cs/student/vbox/tianjliu/tracktor_output/motion_model/motion_model_epoch_28.pth'))
     # motion_model = MotionModelSimpleReID(use_modulator=True, use_bn=False, use_residual=True, vis_roi_features=False, no_visrepr=True)
     # motion_model.load_state_dict(torch.load('/home/tianjliu/MSc_project/output/tracktor/motion/simple_ecc_ratio1_novisrepr_noroi_nobn/simple_reid_motion_model_epoch_5.pth'))
 
+
+    # vis_model = MotionModelSimpleReID(use_modulator=True, use_bn=False, use_residual=True, vis_roi_features=True, no_visrepr=True)
+    # vis_model.load_state_dict(torch.load('/cs/student/vbox/tianjliu/tracktor_output/motion_model/simple_ecc_ratio1_novisrepr_nobn_l25e-5/simple_reid_motion_model_epoch_14.pth'))
+
+    vis_model = VisSimpleReID()
+
+    motion_model = MotionModelV3(vis_model)
+    motion_model.load_state_dict(torch.load('/cs/student/vbox/tianjliu/tracktor_output/motion_model/finetune_l21e-4_chjitter/finetune_motion_model_epoch_5.pth')) 
+
     motion_model.eval()
     motion_model.cuda()
+    # vis_model.eval()
+    # vis_model.cuda()
 
-    save_vis_results = True
+    save_vis_results = False
 
     # tracktor
     if 'oracle' in tracktor:
@@ -101,7 +114,7 @@ def main(tracktor, reid, _config, _log, _run):
     time_total = 0
     num_frames = 0
     mot_accums = []
-    dataset = Datasets(tracktor['dataset'])
+    dataset = Datasets(tracktor['dataset'], {'use_val_split':True})
     for seq in dataset:
         tracker.reset()
 
