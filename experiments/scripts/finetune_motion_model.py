@@ -133,6 +133,14 @@ def train_main(vis_no_reid, no_vis_model, no_motion_repr, no_modulator, max_samp
     motion_model.train()
     motion_model.cuda()
 
+    # freeze bn
+    if not no_vis_model and vis_no_reid:
+        def set_bn_eval(m):
+            classname = m.__class__.__name__
+            if classname.find('BatchNorm') != -1:
+                m.eval()
+        motion_model.vis_model.apply(set_bn_eval)
+
     if sgd:
         optimizer = torch.optim.SGD(motion_model.get_trainable_parameters(), lr=lr, weight_decay=weight_decay, momentum=0.9)
     else:
