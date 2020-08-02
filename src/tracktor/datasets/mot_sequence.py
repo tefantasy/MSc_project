@@ -24,7 +24,7 @@ class MOT17Sequence(Dataset):
     def __init__(self, seq_name=None, dets='', vis_threshold=0.0,
                  normalize_mean=[0.485, 0.456, 0.406],
                  normalize_std=[0.229, 0.224, 0.225],
-                 use_val_split=False):
+                 use_val_split=False, use_low_fps=False):
         """
         Args:
             seq_name (string): Sequence to take
@@ -36,6 +36,8 @@ class MOT17Sequence(Dataset):
 
         if use_val_split:
             data_dir = osp.join(cfg.DATA_DIR, 'MOT17-val')
+        elif use_low_fps:
+            data_dir = osp.join(cfg.DATA_DIR, 'MOT17-low-framerate')
         else:
             data_dir = cfg.DATA_DIR
         
