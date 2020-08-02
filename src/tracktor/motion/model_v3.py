@@ -6,9 +6,11 @@ from .visibility import VisEst
 from .utils import encode_motion, decode_motion, two_p_to_wh, wh_to_two_p
 
 class MotionModelV3(nn.Module):
-    def __init__(self, vis_model, roi_output_dim=256, pool_size=7, representation_dim=1024, motion_repr_dim=512, no_modulator=False, 
+    def __init__(self, vis_model, roi_output_dim=256, pool_size=7, representation_dim=1024, motion_repr_dim=512, gamma=1.0, no_modulator=False, 
                  use_vis_model=True, use_motion_repr=True):
         super(MotionModelV3, self).__init__()
+
+        self.gamma = gamma
 
         self.use_vis_model = use_vis_model
         if use_vis_model:
@@ -99,6 +101,8 @@ class MotionModelV3(nn.Module):
                 vis_output = self.vis_model(early_reid, curr_reid, roi_pool_output, representation_feature).unsqueeze(-1)
             else:
                 vis_output, _ = self.vis_model(roi_pool_output, representation_feature)
+
+            vis_output = torch.pow(vis_output, self.gamma)
 
             if self.use_modulator:
                 modulator = self.vis_modulate(vis_output)
