@@ -44,10 +44,10 @@ class MotionModelV3(nn.Module):
         if use_vis_model:
             if use_vis_feature_for_mod:
                 self.vis_modulate = nn.Sequential(
-                    nn.Linear(self.vis_repr_dim, 4 if use_modulator else 1),
+                    nn.Linear(self.vis_repr_dim, 4 if self.use_modulator else 1),
                     nn.Sigmoid()
                 )
-            elif use_modulator:
+            elif self.use_modulator:
                 self.vis_modulate = nn.Sequential(
                     nn.Linear(1, 4),
                     nn.Sigmoid()
