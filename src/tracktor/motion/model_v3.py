@@ -119,10 +119,10 @@ class MotionModelV3(nn.Module):
             if not self.use_vis_feature_for_mod:
                 vis_output = torch.pow(vis_output, self.gamma)
 
-            if self.use_modulator:
-                modulator = self.vis_modulate(vis_output)
-            elif self.use_vis_feature_for_mod:
+            if self.use_vis_feature_for_mod:
                 modulator = self.vis_modulate(vis_feature)
+            elif self.use_modulator:
+                modulator = self.vis_modulate(vis_output)
             else:
                 modulator = vis_output
 
