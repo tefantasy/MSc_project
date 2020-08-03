@@ -109,7 +109,7 @@ class MotionModelV3(nn.Module):
         if self.use_vis_model:
             if self.use_reid_vis_model:
                 if self.use_vis_feature_for_mod:
-                    vis_feature, vis_output = self.vis_model(early_reid, curr_reid, roi_pool_output, representation_feature, output_feature=True)
+                    vis_output, vis_feature = self.vis_model(early_reid, curr_reid, roi_pool_output, representation_feature, output_feature=True)
                     vis_output = vis_output.unsqueeze(-1)
                 else:
                     vis_output = self.vis_model(early_reid, curr_reid, roi_pool_output, representation_feature).unsqueeze(-1)
