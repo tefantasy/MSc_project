@@ -7,7 +7,7 @@ from .utils import encode_motion, decode_motion, two_p_to_wh, wh_to_two_p
 
 class MotionModelV3(nn.Module):
     def __init__(self, vis_model, roi_output_dim=256, pool_size=7, representation_dim=1024, motion_repr_dim=512, gamma=1.0, no_modulator=False, 
-                 use_vis_model=True, use_motion_repr=True):
+                 use_vis_model=True, use_motion_repr=True, use_vis_feature_for_mod=False):
         super(MotionModelV3, self).__init__()
 
         self.gamma = gamma
@@ -20,6 +20,9 @@ class MotionModelV3(nn.Module):
 
         self.use_motion_repr = use_motion_repr
         self.use_modulator = (not no_modulator)
+        self.use_vis_feature_for_mod = use_vis_feature_for_mod
+
+        self.vis_repr_dim = representation_dim // 2
 
         self.activation = nn.ReLU()
 
@@ -38,11 +41,18 @@ class MotionModelV3(nn.Module):
         )
 
         # modulator #
-        if use_vis_model and self.use_modulator:
-            self.vis_modulate = nn.Sequential(
-                nn.Linear(1, 4),
-                nn.Sigmoid()
-            )
+        if use_vis_model:
+            if use_vis_feature_for_mod:
+                self.vis_modulate = nn.Sequential(
+                    nn.Linear(self.vis_repr_dim, 4 if use_modulator else 1),
+                    nn.Sigmoid()
+                )
+            elif use_modulator:
+                self.vis_modulate = nn.Sequential(
+                    nn.Linear(1, 4),
+                    nn.Sigmoid()
+                )
+            # no module here if no_modulator and no vis_feature_for mod
 
         # motion branch #
         if use_motion_repr:
@@ -98,13 +108,18 @@ class MotionModelV3(nn.Module):
         # vis and modulate
         if self.use_vis_model:
             if self.use_reid_vis_model:
-                vis_output = self.vis_model(early_reid, curr_reid, roi_pool_output, representation_feature).unsqueeze(-1)
+                if self.use_vis_feature_for_mod:
+                    # vis_output is feature in this case
+                    _, vis_output = self.vis_model(early_reid, curr_reid, roi_pool_output, representation_feature, output_feature=True)
+                else:
+                    vis_output = self.vis_model(early_reid, curr_reid, roi_pool_output, representation_feature).unsqueeze(-1)
             else:
                 vis_output, _ = self.vis_model(roi_pool_output, representation_feature)
 
-            vis_output = torch.pow(vis_output, self.gamma)
+            if not self.use_vis_feature_for_mod:
+                vis_output = torch.pow(vis_output, self.gamma)
 
-            if self.use_modulator:
+            if self.use_modulator or self.use_vis_feature_for_mod:
                 modulator = self.vis_modulate(vis_output)
             else:
                 modulator = vis_output

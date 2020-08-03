@@ -40,7 +40,7 @@ class VisSimpleReID(nn.Module):
         self.vis_out = nn.Linear(self.vis_repr_dim, 1)
 
 
-    def forward(self, early_reid, curr_reid, roi_pool_output, representation_feature):
+    def forward(self, early_reid, curr_reid, roi_pool_output, representation_feature, output_feature=False):
         compared_reid_feature = self.compare_reid(torch.cat([early_reid, curr_reid], 1))
 
         vis_spatial_feature = self.vis_conv(roi_pool_output).squeeze(-1).squeeze(-1)
@@ -49,4 +49,7 @@ class VisSimpleReID(nn.Module):
 
         vis_output = torch.sigmoid(self.vis_out(vis_feature))
 
-        return vis_output.squeeze(-1)
+        if output_feature:
+            return vis_output.squeeze(-1), vis_feature
+        else:
+            return vis_output.squeeze(-1)
