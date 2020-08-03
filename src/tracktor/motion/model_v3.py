@@ -109,8 +109,8 @@ class MotionModelV3(nn.Module):
         if self.use_vis_model:
             if self.use_reid_vis_model:
                 if self.use_vis_feature_for_mod:
-                    # vis_output is feature in this case
-                    _, vis_output = self.vis_model(early_reid, curr_reid, roi_pool_output, representation_feature, output_feature=True)
+                    vis_feature, vis_output = self.vis_model(early_reid, curr_reid, roi_pool_output, representation_feature, output_feature=True)
+                    vis_output = vis_output.unsqueeze(-1)
                 else:
                     vis_output = self.vis_model(early_reid, curr_reid, roi_pool_output, representation_feature).unsqueeze(-1)
             else:
@@ -119,8 +119,10 @@ class MotionModelV3(nn.Module):
             if not self.use_vis_feature_for_mod:
                 vis_output = torch.pow(vis_output, self.gamma)
 
-            if self.use_modulator or self.use_vis_feature_for_mod:
+            if self.use_modulator:
                 modulator = self.vis_modulate(vis_output)
+            elif self.use_vis_feature_for_mod:
+                modulator = self.vis_modulate(vis_feature)
             else:
                 modulator = vis_output
 
