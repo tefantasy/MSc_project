@@ -6,8 +6,8 @@ from .visibility import VisEst
 from .utils import encode_motion, decode_motion, two_p_to_wh, wh_to_two_p
 
 class MotionModelV3(nn.Module):
-    def __init__(self, vis_model, roi_output_dim=256, pool_size=7, representation_dim=1024, motion_repr_dim=512, gamma=1.0, no_modulator=False, 
-                 use_vis_model=True, use_motion_repr=True, use_vis_feature_for_mod=False):
+    def __init__(self, vis_model, reid_dim=128, roi_output_dim=256, pool_size=7, representation_dim=1024, motion_repr_dim=512, gamma=1.0, no_modulator=False, 
+                 use_vis_model=True, use_motion_repr=True, use_vis_feature_for_mod=False, use_historical_appearance=False):
         super(MotionModelV3, self).__init__()
 
         self.gamma = gamma
@@ -21,6 +21,7 @@ class MotionModelV3(nn.Module):
         self.use_motion_repr = use_motion_repr
         self.use_modulator = (not no_modulator)
         self.use_vis_feature_for_mod = use_vis_feature_for_mod
+        self.use_historical_appearance = use_historical_appearance
 
         self.vis_repr_dim = representation_dim // 2
 
@@ -35,10 +36,20 @@ class MotionModelV3(nn.Module):
             nn.Conv2d(roi_output_dim * 2, representation_dim, 3),
             self.activation
         )
-        self.appearance_fuse = nn.Sequential(
-            nn.Linear(2 * representation_dim, representation_dim),
-            self.activation
-        )
+        if use_historical_appearance:
+            self.compare_reid = nn.Sequential(
+                nn.Linear(2 * reid_dim, 2 * reid_dim),
+                self.activation
+            )
+            self.appearance_fuse = nn.Sequential(
+                nn.Linear(2 * representation_dim + 2 * reid_dim, representation_dim),
+                self.activation
+            )
+        else:
+            self.appearance_fuse = nn.Sequential(
+                nn.Linear(2 * representation_dim, representation_dim),
+                self.activation
+            )
 
         # modulator #
         if use_vis_model:
@@ -99,7 +110,11 @@ class MotionModelV3(nn.Module):
 
         # appearance
         spatial_feature = self.appearance_conv(roi_pool_output).squeeze(-1).squeeze(-1)
-        appearance_feature = self.appearance_fuse(torch.cat([representation_feature, spatial_feature], 1))
+        if self.use_historical_appearance:
+            compared_reid_feature = self.compare_reid(torch.cat([early_reid, curr_reid], 1))
+            appearance_feature = self.appearance_fuse(torch.cat([representation_feature, spatial_feature, compared_reid_feature], 1))
+        else:
+            appearance_feature = self.appearance_fuse(torch.cat([representation_feature, spatial_feature], 1))
 
         # motion
         if self.use_motion_repr:
