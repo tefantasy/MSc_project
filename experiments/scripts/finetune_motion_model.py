@@ -64,8 +64,8 @@ def get_batch_mean_early_reid(reid_model, early_reid_patches):
         batch_reid_features = torch.stack(batch_reid_features, 0)
         return batch_reid_features
 
-def train_main(vis_no_reid, no_vis_model, no_motion_repr, no_modulator, use_vis_feature_for_mod, use_historical_appearance, max_sample_frame, 
-               sgd, lr, weight_decay, batch_size, pretrained_path, output_dir, ex_name):
+def train_main(vis_no_reid, no_vis_model, no_motion_repr, no_modulator, use_vis_feature_for_mod, use_historical_appearance, correction, 
+               max_sample_frame, sgd, lr, weight_decay, batch_size, pretrained_path, output_dir, ex_name):
     random.seed(12345)
     torch.manual_seed(12345)
     torch.cuda.manual_seed(12345)
@@ -82,8 +82,8 @@ def train_main(vis_no_reid, no_vis_model, no_motion_repr, no_modulator, use_vis_
         f.write('[Experiment name]%s\n' % ex_name)
         f.write('[Pretrained]%s\n\n' % pretrained_path)
         f.write('[Parameters]\n')
-        f.write('vis_no_reid=%r\nno_vis_model=%r\nno_motion_repr=%r\nno_modulator=%r\nuse_vis_feature_for_mod=%r\nuse_historical_appearance=%r\nmax_sample_frame=%d\nlr=%f\nweight_decay=%f\nbatch_size=%d\n\n' % 
-            (vis_no_reid, no_vis_model, no_motion_repr, no_modulator, use_vis_feature_for_mod, use_historical_appearance, max_sample_frame, lr, weight_decay, batch_size))
+        f.write('vis_no_reid=%r\nno_vis_model=%r\nno_motion_repr=%r\nno_modulator=%r\nuse_vis_feature_for_mod=%r\nuse_historical_appearance=%r\ncorrection=%r\nmax_sample_frame=%d\nlr=%f\nweight_decay=%f\nbatch_size=%d\n\n' % 
+            (vis_no_reid, no_vis_model, no_motion_repr, no_modulator, use_vis_feature_for_mod, use_historical_appearance, correction, max_sample_frame, lr, weight_decay, batch_size))
         f.write('[Loss log]\n')
 
     with open('experiments/cfgs/tracktor.yaml', 'r') as f:
@@ -129,7 +129,7 @@ def train_main(vis_no_reid, no_vis_model, no_motion_repr, no_modulator, use_vis_
         vis_model = None
 
     motion_model = MotionModelV3(vis_model, no_modulator=no_modulator, use_vis_model=(not no_vis_model), use_motion_repr=(not no_motion_repr), 
-                           use_vis_feature_for_mod=use_vis_feature_for_mod, use_historical_appearance=use_historical_appearance)
+                           use_vis_feature_for_mod=use_vis_feature_for_mod, use_historical_appearance=use_historical_appearance, correction=correction)
 
     motion_model.train()
     motion_model.cuda()
@@ -287,6 +287,7 @@ if __name__ == '__main__':
     parser.add_argument('--no_modulator', action='store_true')
     parser.add_argument('--use_vis_feature_for_mod', action='store_true')
     parser.add_argument('--use_historical_appearance', action='store_true')
+    parser.add_argument('--correction', action='store_true')
 
     parser.add_argument('--vis_no_reid', action='store_true')
     parser.add_argument('--no_vis_model', action='store_true')
@@ -296,7 +297,7 @@ if __name__ == '__main__':
     print(args)
 
     train_main(args.vis_no_reid, args.no_vis_model, args.no_motion_repr, 
-               args.no_modulator, args.use_vis_feature_for_mod, args.use_historical_appearance, args.max_sample_frame, 
-               args.sgd, args.lr, args.weight_decay, args.batch_size, 
+               args.no_modulator, args.use_vis_feature_for_mod, args.use_historical_appearance, args.correction,
+               args.max_sample_frame, args.sgd, args.lr, args.weight_decay, args.batch_size, 
                args.pretrained_path, args.output_dir, args.ex_name)
 

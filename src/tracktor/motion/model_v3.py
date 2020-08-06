@@ -6,11 +6,9 @@ from .visibility import VisEst
 from .utils import encode_motion, decode_motion, two_p_to_wh, wh_to_two_p
 
 class MotionModelV3(nn.Module):
-    def __init__(self, vis_model, reid_dim=128, roi_output_dim=256, pool_size=7, representation_dim=1024, motion_repr_dim=512, gamma=1.0, no_modulator=False, 
+    def __init__(self, vis_model, reid_dim=128, roi_output_dim=256, pool_size=7, representation_dim=1024, motion_repr_dim=512, correction=False, no_modulator=False, 
                  use_vis_model=True, use_motion_repr=True, use_vis_feature_for_mod=False, use_historical_appearance=False):
         super(MotionModelV3, self).__init__()
-
-        self.gamma = gamma
 
         self.use_vis_model = use_vis_model
         if use_vis_model:
@@ -22,6 +20,7 @@ class MotionModelV3(nn.Module):
         self.use_modulator = (not no_modulator)
         self.use_vis_feature_for_mod = use_vis_feature_for_mod
         self.use_historical_appearance = use_historical_appearance
+        self.correction = correction
 
         self.vis_repr_dim = representation_dim // 2
 
@@ -131,8 +130,9 @@ class MotionModelV3(nn.Module):
             else:
                 vis_output, _ = self.vis_model(roi_pool_output, representation_feature)
 
-            if not self.use_vis_feature_for_mod:
-                vis_output = torch.pow(vis_output, self.gamma)
+            if not self.use_vis_feature_for_mod and self.correction:
+                vis_output = 15.0 * vis_output - 10.0
+                vis_output = torch.sigmoid(vis_output)
 
             if self.use_vis_feature_for_mod:
                 modulator = self.vis_modulate(vis_feature)
