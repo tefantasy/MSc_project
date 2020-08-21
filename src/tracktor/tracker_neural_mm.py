@@ -428,9 +428,8 @@ class TrackerNeuralMM(object):
             if len(self.tracks):
                 # CHANGED do not terminate tracks when they are occluded by each other
 
-                if self.do_reid:
-                    new_features = self.get_appearances(blob)
-                    self.add_features(new_features)
+                new_features = self.get_appearances(blob)
+                self.add_features(new_features)
 
                 # check vis result for next time step
                 if self.save_vis_results:
