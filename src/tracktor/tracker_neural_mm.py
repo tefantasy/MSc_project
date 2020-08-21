@@ -167,11 +167,9 @@ class TrackerNeuralMM(object):
     
     def reid(self, blob, new_det_pos, new_det_scores):
         """Tries to ReID inactive tracks with provided detections."""
-        new_det_features = [torch.zeros(0).cuda() for _ in range(len(new_det_pos))]
+        new_det_features = self.reid_network.test_rois(blob['img'], new_det_pos).data
         
         if self.do_reid:
-            new_det_features = self.reid_network.test_rois(
-                blob['img'], new_det_pos).data
 
             if len(self.inactive_tracks) >= 1:
                 # calculate appearance distances
