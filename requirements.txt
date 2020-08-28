@@ -77,6 +77,8 @@ soupsieve==1.9.5
 tensorboardX==2.0
 terminado==0.8.3
 testpath==0.4.4
+torch==1.4.0
+torchvision==0.5.0
 tornado==4.5.3
 tqdm==4.38.0
 traitlets==4.3.3
