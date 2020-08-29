@@ -23,6 +23,8 @@ This repository provides the code for [Exploiting Motion and Visibility Cues for
     1. Download zip file from [here](https://vision.in.tum.de/webshare/u/meinhard/tracking_wo_bnw-output_v2.zip).
     2. Extract in `output` directory.
 
+5. Download the paramters of Neural Motion Model from [here](https://drive.google.com/file/d/1De0buwcdaNugu7I4OKliSrnmNsrfAle2/view?usp=sharing), and put it in `output/motion` directory. You may need to make a new `motion` directory. 
+
 ## Evaluation
 
 0. (if you would like to evaluate on validation split of MOT17 training set) Run ``` experiments/scripts/create_val_dataset.py ```. 
