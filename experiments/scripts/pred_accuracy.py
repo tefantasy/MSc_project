@@ -216,7 +216,7 @@ if __name__ == '__main__':
     # vis_model = VisEst(conv_only=False)
 
     motion_model = MotionModelV3(vis_model, no_modulator=False, use_vis_model=True, use_motion_repr=True)
-    motion_model.load_state_dict(torch.load('/cs/student/vbox/tianjliu/tracktor_output/motion_model/finetune_l21e-4_chjitter/finetune_motion_model_epoch_5.pth'))
+    motion_model.load_state_dict(torch.load('output/motion/finetune_motion_model_v3.pth'))
 
     motion_model.eval()
     motion_model.cuda()
