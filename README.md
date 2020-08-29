@@ -37,16 +37,13 @@ This repository provides the code for [Exploiting Motion and Visibility Cues for
 
 3. If you would like to evaluate Neural Motion Model on the full MOT17 training set, you can modify the line 
 
-```
-dataset = Datasets(tracktor['dataset'], {'use_val_split':True})
-```
-
+  ```
+  dataset = Datasets(tracktor['dataset'], {'use_val_split':True})
+  ```
 into
-
-```
-dataset = Datasets(tracktor['dataset'])
-```
-
+  ```
+  dataset = Datasets(tracktor['dataset'])
+  ```
 in ``` test_tracktor.py ```. For other configurations of dataset please change ``` experiments/cfgs/tracktor.yaml ```.
 
 ## Training Neural Motion Model
