@@ -1,6 +1,9 @@
 # Exploiting Motion and Visibility Cues for Tackling Occlusions in Multiple Object Tracking
 
-This repository provides the code for [Exploiting Motion and Visibility Cues for Tackling Occlusions in Multiple Object Tracking], a master's project of MSc DSML at UCL.
+This repository provides the code for the project [Exploiting Motion and Visibility Cues for Tackling Occlusions in Multiple Object Tracking].
+This is a master's project of MSc DSML, done in Prism group, CS department, UCL. 
+
+**Note:** PDF version of the thesis will be available in this repository soon. 
 
 ## Installation
 
